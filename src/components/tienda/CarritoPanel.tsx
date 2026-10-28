@@ -77,7 +77,7 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
             <p className="display text-3xl">Tu carrito está vacío</p>
             <p className="text-ink-soft">Elige tu liga, tu equipo y ponle tu nombre.</p>
-            <Link href="/#vitrina" onClick={cerrar} className="kicker bg-navy-950 px-6 py-4 font-bold text-white">Ver la vitrina</Link>
+            <Link href="/vitrina" onClick={cerrar} className="kicker bg-navy-950 px-6 py-4 font-bold text-white">Ver la vitrina</Link>
           </div>
         ) : (
           <>
@@ -167,7 +167,7 @@ function EnPausa({ instagram, onCerrar }: { instagram: string; onCerrar: () => v
       <div className="grid size-[72px] place-items-center rounded-full bg-sky-soft text-navy-800"><TimerOff size={32} aria-hidden /></div>
       <p className="display text-4xl">Carrito en pausa</p>
       <p className="text-[15px] leading-relaxed text-ink-soft">Ningún drop disponible por ahora. Pronto realizaremos otro drop y podrás armar tu pedido.</p>
-      <Link href="/#vitrina" onClick={onCerrar} className="kicker flex h-14 w-full items-center justify-center bg-navy-950 font-bold text-white">Seguir viendo la vitrina</Link>
+      <Link href="/vitrina" onClick={onCerrar} className="kicker flex h-14 w-full items-center justify-center bg-navy-950 font-bold text-white">Seguir viendo la vitrina</Link>
       <a href={`https://instagram.com/${instagram.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="kicker flex h-14 w-full items-center justify-center gap-2 border border-navy-950/20 font-bold">
         <InstagramLogo size={18} aria-hidden /> Síguenos para enterarte
       </a>

@@ -27,7 +27,7 @@ export function Portada({ whatsapp }: { whatsapp: string }) {
               Camisetas de clubes, selecciones y retro, con tu nombre y tu número en la espalda. Arma tu pedido aquí, lo mandas por WhatsApp y te la entregamos en Machala.
             </p>
             <div className="flex flex-wrap gap-3.5">
-              <a href="#vitrina" className="kicker flex items-center gap-2.5 bg-sky px-7 py-[18px] text-sm font-bold text-navy-950">
+              <a href="/vitrina" className="kicker flex items-center gap-2.5 bg-sky px-7 py-[18px] text-sm font-bold text-navy-950">
                 Ver la vitrina <ArrowDownRight size={18} aria-hidden />
               </a>
               <a href={enlaceWhatsapp(whatsapp, '¡Hola El Hincha! Quiero hacer un pedido.')} target="_blank" rel="noopener noreferrer" className="kicker flex items-center gap-2.5 border border-white px-7 py-[18px] text-sm font-bold">

@@ -10,16 +10,15 @@ import { MAX_NOMBRE, MENSAJE_ERROR, largo, normalizarNombre, normalizarNumero, v
 import { formatoPrecio } from '@/lib/domain/pricing'
 import type { ProductoVista } from '@/lib/domain/types'
 import { CuentaRegresivaCorta } from './CuentaRegresivaCorta'
+import { useDorsal } from './producto/DorsalContexto'
 
 interface ComboOferta { id: string; nombre: string; precio: number; precioSuelto: number; fotoShort: string }
 interface DropInfo { nombre: string; pideHasta: string; llegaEntre: string; cierraEn: string }
 
 export function Configurador({ producto: p, combo, drop }: { producto: ProductoVista; combo: ComboOferta | null; drop: DropInfo | null }) {
   const agregar = useCarrito(s => s.agregar)
+  const { nombre, numero, personalizar, setNombre, setNumero, setPersonalizar } = useDorsal()
   const [talla, setTalla] = useState<string | null>(null)
-  const [personalizar, setPersonalizar] = useState(p.tipo.aceptaPersonalizacion)
-  const [nombre, setNombre] = useState('')
-  const [numero, setNumero] = useState('')
   const [parches, setParches] = useState<string[]>([])
   const [conCombo, setConCombo] = useState(false)
   const [numeroShort, setNumeroShort] = useState('')
@@ -114,13 +113,13 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       {p.tipo.aceptaPersonalizacion && (
         <div className="space-y-4 border border-sky bg-navy-900 p-5 md:p-6">
           <div className="flex items-center justify-between">
-            <p className="flex items-center gap-2.5 text-[17px] font-bold"><Shirt size={20} className="text-sky" aria-hidden /> Nombre y número · gratis</p>
+            <p className="flex items-center gap-2.5 text-[17px] font-bold"><Shirt size={20} className="text-sky" aria-hidden /> {p.tipo.esShort ? 'Número · gratis' : 'Nombre y número · gratis'}</p>
             <button
               type="button"
               role="switch"
               aria-checked={personalizar}
               aria-label="Personalizar con nombre y número"
-              onClick={() => setPersonalizar(v => !v)}
+              onClick={() => setPersonalizar(!personalizar)}
               className={`flex h-7 w-12 items-center rounded-full p-[3px] transition ${personalizar ? 'justify-end bg-sky' : 'justify-start bg-white/20'}`}
             >
               <span className="size-[22px] rounded-full bg-navy-950" />
@@ -129,13 +128,14 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
 
           {personalizar && (
             <div className="flex flex-col gap-5 sm:flex-row">
-              <div className="mx-auto w-44 shrink-0 sm:mx-0">
-                <VistaPreviaCamiseta nombre={nombre.trim()} numero={numero} className="w-full" />
+              {/* En computadora la vista previa está en la galería; en celular queda a la vista aquí. */}
+              <div className="mx-auto w-40 shrink-0 sm:mx-0 lg:hidden">
+                {p.tipo.esShort ? <VistaPreviaShort numero={numero} className="w-full" /> : <VistaPreviaCamiseta nombre={nombre.trim()} numero={numero} className="w-full" />}
                 <p className="kicker mt-1 text-center text-[9px] text-muted">Vista previa referencial</p>
               </div>
               <div className="flex-1 space-y-3">
                 <div className="flex gap-3">
-                  <label className="flex-1 space-y-2">
+                  {!p.tipo.esShort && <label className="flex-1 space-y-2">
                     <span className="kicker text-[11px] text-muted">Nombre</span>
                     <input
                       value={nombre}
@@ -146,7 +146,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
                       placeholder="VERA"
                       className="display w-full border border-line bg-navy-950 px-4 py-3.5 text-2xl tracking-wide outline-none placeholder:text-white/20 focus:border-sky"
                     />
-                  </label>
+                  </label>}
                   <label className="w-24 space-y-2">
                     <span className="kicker text-[11px] text-muted">Número</span>
                     <input
@@ -159,7 +159,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
                   </label>
                 </div>
                 <p id="ayuda-nombre" className={`text-[13px] ${errorNombre ? 'text-red-300' : 'text-muted'}`}>
-                  {errorNombre ? MENSAJE_ERROR[errorNombre] : `${largo(nombre.trim())}/${MAX_NOMBRE} caracteres · Ñ, tildes y apóstrofe permitidos · número 0–99`}
+                  {p.tipo.esShort ? 'Número del 0 al 99. El short no lleva nombre.' : errorNombre ? MENSAJE_ERROR[errorNombre] : `${largo(nombre.trim())}/${MAX_NOMBRE} caracteres · Ñ, tildes y apóstrofe permitidos · número 0–99`}
                 </p>
               </div>
             </div>

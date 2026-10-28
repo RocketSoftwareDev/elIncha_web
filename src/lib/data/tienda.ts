@@ -49,6 +49,18 @@ export async function vitrina(ligaSlug?: string): Promise<ProductoVista[]> {
     .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.equipo.orden - b.equipo.orden)
 }
 
+/** Todo el catálogo visible; /vitrina filtra con `buscar` (lib/domain/vitrina). */
+export async function catalogoVisible(): Promise<ProductoVista[]> {
+  return db.productos
+    .filter(p => p.visible)
+    .map(p => vista(p.id)!)
+    .filter(p => p.liga.visible)
+}
+
+export async function equiposVisibles() {
+  return [...db.equipos].sort((a, b) => a.orden - b.orden)
+}
+
 export async function productoPorSlug(slug: string): Promise<ProductoVista | null> {
   const p = db.productos.find(x => x.slug === slug && x.visible)
   return p ? vista(p.id) : null

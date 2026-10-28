@@ -31,7 +31,7 @@ export function DropSeccion({ drop, abierto, ahora, whatsapp }: { drop: Drop | n
         <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
           <CuentaRegresiva cierraEn={abierto && drop!.mostrarCuentaRegresiva ? drop!.cierraEn : null} ahoraServidor={ahora} />
           {abierto ? (
-            <Link href="#vitrina" className="flex min-h-40 flex-col justify-between bg-whatsapp p-7 text-navy-950 lg:w-[300px]">
+            <Link href="/vitrina" className="flex min-h-40 flex-col justify-between bg-whatsapp p-7 text-navy-950 lg:w-[300px]">
               <WhatsappLogo size={40} weight="fill" aria-hidden />
               <span className="display text-4xl leading-none">Armar mi<br />pedido →</span>
             </Link>

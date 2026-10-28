@@ -14,7 +14,7 @@ export function Footer({ ajustes }: { ajustes: Ajustes }) {
     { label: 'WhatsApp', href: enlaceWhatsapp(ajustes.whatsapp, '¡Hola El Hincha!'), Icono: WhatsappLogo },
   ]
   const columnas = [
-    { titulo: 'Tienda', links: [['La vitrina', '/#vitrina'], ['Tu dorsal', '/#vitrina'], ['El drop', '/#drop'], ['Precios', '/#como-comprar']] },
+    { titulo: 'Tienda', links: [['La vitrina', '/vitrina'], ['Tu dorsal', '/vitrina'], ['El drop', '/#drop'], ['Precios', '/#como-comprar']] },
     { titulo: 'Ayuda', links: [['Cómo comprar', '/#como-comprar'], ['Guía de tallas', '/#como-comprar'], ['Envíos en El Oro', '/#como-comprar'], ['Escríbenos', redes[3].href]] },
   ]
 

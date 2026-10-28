@@ -1,23 +1,24 @@
 import { ComoComprar } from '@/components/tienda/ComoComprar'
 import { DropSeccion } from '@/components/tienda/DropSeccion'
+import { LigasGancho } from '@/components/tienda/LigasGancho'
 import { Portada, Ticker } from '@/components/tienda/Portada'
 import { Somos } from '@/components/tienda/Somos'
-import { Vitrina } from '@/components/tienda/Vitrina'
 import { aceptaPedidos } from '@/lib/domain/drop'
-import { ajustesPublicos, combosActivos, dropActual, ligasVisibles, tipos, vitrina } from '@/lib/data/tienda'
+import { ajustesPublicos, catalogoVisible, combosActivos, dropActual, ligasVisibles, tipos } from '@/lib/data/tienda'
 import { ahora as horaServidor } from '@/lib/reloj'
 
-export default async function Inicio({ searchParams }: { searchParams: Promise<{ liga?: string }> }) {
-  const { liga } = await searchParams
-  const [ligas, drop, ajustes, listaTipos, combos] = await Promise.all([ligasVisibles(), dropActual(), ajustesPublicos(), tipos(), combosActivos()])
-  const ligaActual = ligas.find(l => l.slug === liga) ?? null
-  const productos = await vitrina(ligaActual?.slug)
+export default async function Inicio() {
+  const [ligas, productos, drop, ajustes, listaTipos, combos] = await Promise.all([
+    ligasVisibles(), catalogoVisible(), dropActual(), ajustesPublicos(), tipos(), combosActivos(),
+  ])
+  const conteo = new Map<string, number>()
+  for (const p of productos) conteo.set(p.liga.slug, (conteo.get(p.liga.slug) ?? 0) + 1)
   const ahora = horaServidor()
 
   return (
     <>
-      {/* La vitrina abre la página; la portada va debajo (pedido de la cotización). */}
-      <Vitrina ligas={ligas} productos={productos} ligaActual={ligaActual} />
+      {/* Las ligas abren la página como gancho; las camisetas viven en /vitrina. */}
+      <LigasGancho ligas={ligas} conteo={conteo} total={productos.length} />
       <Portada whatsapp={ajustes.whatsapp} />
       <Ticker />
       <Somos />

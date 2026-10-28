@@ -5,7 +5,7 @@ import { enlaceWhatsapp } from '@/lib/domain/whatsapp'
 import { BotonCarrito } from './BotonCarrito'
 
 const LINKS = [
-  { href: '/#vitrina', label: 'La vitrina' },
+  { href: '/vitrina', label: 'La vitrina' },
   { href: '/#drop', label: 'El drop' },
   { href: '/#como-comprar', label: 'Cómo comprar' },
   { href: '/#nosotros', label: 'Nosotros' },

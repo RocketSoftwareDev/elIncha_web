@@ -59,7 +59,7 @@ function semilla(): MockDb {
   })
 
   const productos: Producto[] = [
-    p('real-madrid-local-25-26', 'real-madrid', 'player', 'Local 25/26', ['dorsal-vera.png', 'prod-1.jpg', 'detalle-1.jpg', 'detalle-2.jpg'], ['ucl', 'laliga'], { destacado: true }),
+    p('real-madrid-local-25-26', 'real-madrid', 'player', 'Local 25/26', ['detalle-1.jpg', 'prod-1.jpg', 'detalle-2.jpg'], ['ucl', 'laliga'], { destacado: true }),
     p('real-madrid-short-local', 'real-madrid', 'short', 'Short Local 25/26', ['short.jpg'], []),
     p('barcelona-local-25-26', 'barcelona', 'player', 'Local 25/26', ['prod-2.jpg', 'detalle-3.jpg'], ['ucl', 'laliga']),
     p('barcelona-visitante-25-26', 'barcelona', 'player', 'Visitante 25/26', ['prod-5.jpg'], ['ucl', 'laliga']),
@@ -67,7 +67,7 @@ function semilla(): MockDb {
     p('betis-visitante-25-26', 'betis', 'player', 'Visitante 25/26', ['prod-4.jpg'], ['laliga']),
     p('man-city-local-25-26', 'man-city', 'player', 'Local 25/26', ['prod-6.jpg'], ['ucl', 'epl']),
     p('arsenal-local-25-26', 'arsenal', 'player', 'Local 25/26', ['prod-9.jpg'], ['ucl', 'epl']),
-    p('bayern-local-25-26', 'bayern', 'player', 'Local 25/26', ['prod-1.jpg'], ['ucl', 'bundes'], { destacado: true }),
+    p('bayern-local-25-26', 'bayern', 'player', 'Local 25/26', ['detalle-3.jpg', 'prod-1.jpg'], ['ucl', 'bundes'], { destacado: true }),
     p('bayern-retro-2001', 'bayern', 'retro', 'Retro 2001 (Final Champions)', ['prod-9.jpg'], ['ucl']),
     p('dortmund-local-25-26', 'dortmund', 'player', 'Local 25/26', ['prod-8.jpg'], ['ucl', 'bundes']),
     p('inter-miami-local', 'inter-miami', 'player', 'Local 2026', ['prod-2.jpg'], []),
