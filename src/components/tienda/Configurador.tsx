@@ -11,6 +11,7 @@ import { formatoPrecio } from '@/lib/domain/pricing'
 import type { ProductoVista } from '@/lib/domain/types'
 import { CuentaRegresivaCorta } from './CuentaRegresivaCorta'
 import { useDorsal } from './producto/DorsalContexto'
+import { registrar } from '@/lib/analitica/registrar'
 
 interface ComboOferta { id: string; nombre: string; precio: number; precioSuelto: number; fotoShort: string }
 interface DropInfo { nombre: string; pideHasta: string; llegaEntre: string; cierraEn: string }
@@ -47,6 +48,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       ...nombresParches.map(x => `parche ${x}`),
     ].filter(Boolean).join(' · ')
 
+    registrar({ tipo: 'agregar_carrito', ruta: `/producto/${p.slug}`, productoId: p.id })
     agregar({
       productoId: p.id,
       comboId: conCombo && combo ? combo.id : null,

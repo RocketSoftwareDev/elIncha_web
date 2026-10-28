@@ -5,6 +5,7 @@ import { FichaProducto } from '@/components/tienda/producto/FichaProducto'
 import { aceptaPedidos, resumenDrop } from '@/lib/domain/drop'
 import { formatoPrecio } from '@/lib/domain/pricing'
 import { combosActivos, dropActual, productoPorSlug, shortDelEquipo } from '@/lib/data/tienda'
+import { RegistrarVistaProducto } from '@/lib/analitica/Registro'
 import { ahora } from '@/lib/reloj'
 
 type Params = { params: Promise<{ slug: string }> }
@@ -31,6 +32,7 @@ export default async function Producto({ params }: Params) {
           <Link href={`/vitrina?liga=${producto.liga.slug}`} className="hover:text-white">{producto.liga.nombre}</Link>/
           <span className="text-white">{producto.equipo.nombre} {producto.nombre}</span>
         </nav>
+        <RegistrarVistaProducto productoId={producto.id} ruta={`/producto/${producto.slug}`} />
         <FichaProducto
           producto={producto}
           combo={combo && short ? { id: combo.id, nombre: combo.nombre, precio: combo.precio, precioSuelto: producto.precio + short.precio, fotoShort: short.fotos[0] } : null}

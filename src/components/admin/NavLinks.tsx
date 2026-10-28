@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, MessageCircle, Settings, Shirt, Sparkles, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, MessageCircle, Settings, Shirt, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -19,7 +19,6 @@ const GRUPOS: { titulo: string; items: { href: string; label: string; icono: Luc
       { href: '/admin/productos', label: 'Productos', icono: Shirt },
       { href: '/admin/ligas', label: 'Ligas y equipos', icono: Trophy },
       { href: '/admin/precios', label: 'Precios y combos', icono: Tag },
-      { href: '/admin/precios#personalizacion', label: 'Personalización', icono: Sparkles },
     ],
   },
   { titulo: 'Tienda', items: [{ href: '/admin/ajustes', label: 'Ajustes y pagos', icono: Settings }] },
@@ -33,7 +32,7 @@ export function NavLinks() {
         <div key={g.titulo} className="flex shrink-0 gap-0.5 lg:flex-col">
           <p className="kicker hidden px-3 pb-1 text-[10px] text-[#5b6b95] lg:block">{g.titulo}</p>
           {g.items.map(({ href, label, icono: Icono }) => {
-            const activo = !href.includes('#') && (ruta === href || ruta.startsWith(`${href}/`))
+            const activo = ruta === href || ruta.startsWith(`${href}/`)
             return (
               <Link
                 key={href}

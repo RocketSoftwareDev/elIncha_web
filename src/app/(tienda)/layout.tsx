@@ -3,6 +3,7 @@ import { Footer } from '@/components/tienda/Footer'
 import { Header } from '@/components/tienda/Header'
 import { aceptaPedidos, resumenDrop } from '@/lib/domain/drop'
 import { ajustesPublicos, dropActual } from '@/lib/data/tienda'
+import { RegistroVistas } from '@/lib/analitica/Registro'
 import { ahora } from '@/lib/reloj'
 
 export default async function TiendaLayout({ children }: { children: React.ReactNode }) {
@@ -11,6 +12,7 @@ export default async function TiendaLayout({ children }: { children: React.React
 
   return (
     <>
+      <RegistroVistas />
       <Header whatsapp={ajustes.whatsapp} />
       <main>{children}</main>
       <Footer ajustes={ajustes} />

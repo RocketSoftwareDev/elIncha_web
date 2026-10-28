@@ -6,6 +6,7 @@ import 'server-only'
 import type {
   Ajustes, Combo, Drop, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, Producto, TipoPrenda,
 } from '@/lib/domain/types'
+import { reiniciarEventos } from './estadisticas'
 import { db, reiniciarDatos } from './mock-db'
 
 // ---------- Resumen ----------
@@ -181,4 +182,5 @@ export async function guardarAjustes(cambios: Partial<Ajustes>) {
 /** Solo para modo de prueba: vuelve a los datos iniciales. */
 export async function reiniciar() {
   reiniciarDatos()
+  reiniciarEventos()
 }

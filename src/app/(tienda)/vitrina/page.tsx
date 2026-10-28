@@ -7,6 +7,7 @@ import { Filtros } from '@/components/vitrina/Filtros'
 import { aceptaPedidos, fechaCorta } from '@/lib/domain/drop'
 import { alternar, buscar, idCorto, leerFiltros, urlVitrina } from '@/lib/domain/vitrina'
 import { catalogoVisible, dropActual, equiposVisibles, ligasVisibles, tipos } from '@/lib/data/tienda'
+import { RegistrarBusquedaVacia } from '@/lib/analitica/Registro'
 import { ahora } from '@/lib/reloj'
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default async function Vitrina({ searchParams }: Props) {
 
   return (
     <>
+      <RegistrarBusquedaVacia termino={filtros.q} total={r.total} />
       <div className="border-b border-line px-4 pb-8 pt-8 md:px-[72px] md:pt-10">
         <div className="mx-auto max-w-[1296px] space-y-6">
           <p className="kicker text-muted"><Link href="/" className="hover:text-white">Inicio</Link> / La vitrina</p>
