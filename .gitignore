@@ -1,0 +1,30 @@
+# Secretos: nunca en git. Viven solo en el VPS (/opt/elhincha/secrets).
+.env
+.env.*
+!*.example
+secrets/
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+
+# Dependencias y build
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Datos locales
+uploads/
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

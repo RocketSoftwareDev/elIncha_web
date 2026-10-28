@@ -1,0 +1,22 @@
+# Nada de esto entra a la imagen de Docker.
+.git
+.githooks
+node_modules
+.next
+dist
+coverage
+.env
+.env.*
+secrets
+uploads
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+*.log
+Dockerfile
+.dockerignore
+README.md
