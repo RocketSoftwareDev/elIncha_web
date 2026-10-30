@@ -60,7 +60,9 @@ export function Filtros({ filtros: f, ligas, tipos, equipos, porLiga, porTipo, p
           return (
             <Link key={l.id} href={urlVitrina(f, { ligas: alternar(f.ligas, l.slug) })} scroll={false} aria-pressed={on} className={`flex items-center gap-3 ${n === 0 && !on ? 'opacity-40' : ''}`}>
               <Casilla marcada={on} />
-              <span className="relative size-7 shrink-0 overflow-hidden rounded-full"><Image src={l.foto} alt="" fill sizes="28px" className="object-cover" /></span>
+              <span className="relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-navy-800 text-xs font-bold text-sky">
+                {l.foto ? <Image src={l.foto} alt="" fill sizes="28px" className="object-cover" /> : l.nombre.slice(0, 1)}
+              </span>
               <span className={`flex-1 text-sm ${on ? 'font-semibold text-white' : 'text-[#d6def0]'}`}>{l.nombre}</span>
               <span className="font-mono text-[11px] text-muted">{n}</span>
             </Link>

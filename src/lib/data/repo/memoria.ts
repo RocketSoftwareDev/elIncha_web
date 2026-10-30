@@ -118,9 +118,17 @@ export const repoMemoria: Repo = {
     while (intentos.length > 5000) intentos.shift()
   },
 
+  async eliminarLiga(id) {
+    const equipos = new Set(db.equipos.filter(e => e.ligaId === id).map(e => e.id))
+    db.productos = db.productos.filter(p => !equipos.has(p.equipoId))
+    db.equipos = db.equipos.filter(e => e.ligaId !== id)
+    db.ligas = db.ligas.filter(l => l.id !== id)
+  },
+
   async subirFoto() {
     throw new ErrorNegocio('En modo de prueba no se suben fotos: configura Supabase.')
   },
+  async borrarCarpetas() {},
   async ping() {},
   async reiniciar() {
     reiniciarDatos()

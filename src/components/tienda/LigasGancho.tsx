@@ -21,13 +21,15 @@ export function LigasGancho({ ligas, conteo, total }: { ligas: Liga[]; conteo: M
               <li key={l.id}>
                 <Link href={`/vitrina?liga=${l.slug}`} className="group flex flex-col items-center gap-3.5">
                   <span className="relative size-32 overflow-hidden rounded-full ring-1 ring-line transition group-hover:ring-4 group-hover:ring-sky md:size-[168px]">
-                    <Image src={l.foto} alt="" fill sizes="168px" className="object-cover transition duration-300 group-hover:scale-105" />
+                    {l.foto
+                      ? <Image src={l.foto} alt="" fill sizes="168px" className="object-cover transition duration-300 group-hover:scale-105" />
+                      : <span className="display grid size-full place-items-center bg-navy-800 text-5xl text-sky md:text-6xl" aria-hidden>{l.nombre.slice(0, 1)}</span>}
                     <span className="kicker absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 bg-sky px-2.5 py-1.5 text-[10px] font-bold text-navy-950 opacity-0 transition group-hover:opacity-100">
                       Entrar <ArrowRight size={12} aria-hidden />
                     </span>
                   </span>
                   <span className="kicker text-center text-[11px] font-bold transition group-hover:text-sky md:text-[13px]">{l.nombre}</span>
-                  <span className="-mt-2 text-[13px] text-muted">{n} {n === 1 ? 'camiseta' : 'camisetas'}</span>
+                  <span className="-mt-2 text-[13px] text-muted">{n === 0 ? 'Próximamente' : `${n} ${n === 1 ? 'camiseta' : 'camisetas'}`}</span>
                 </Link>
               </li>
             )

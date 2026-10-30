@@ -200,6 +200,37 @@ export async function quitarFotoAccion(f: FormData) {
 
 // ---------- Ligas y equipos ----------
 
+export async function crearLigaAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  let id = ''
+  try {
+    const nombre = z.string().trim().min(2, 'Escribe el nombre de la liga').max(40).parse(f.get('nombre'))
+    id = (await admin.crearLiga(nombre)).id
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  // Queda abierta para subirle su imagen enseguida.
+  redirect(`/admin/ligas?liga=${id}`)
+}
+
+export async function alternarLigaVisibleAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.alternarLigaVisible(z.string().min(1).max(64).parse(f.get('id')))
+  refrescar()
+}
+
+export async function eliminarLigaAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.eliminarLiga(z.string().min(1).max(64).parse(f.get('id')), z.string().max(60).parse(f.get('confirmacion') ?? ''))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  redirect('/admin/ligas')
+}
+
 export async function crearEquipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
   await requerirAdmin()
   try {

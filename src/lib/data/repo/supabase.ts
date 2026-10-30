@@ -164,6 +164,19 @@ export const repoSupabase: Repo = {
     ok(await sb().storage.from('fotos').upload(ruta, datos, { contentType: 'image/webp', upsert: false, cacheControl: '31536000' }), 'subir foto')
     return sb().storage.from('fotos').getPublicUrl(ruta).data.publicUrl
   },
+  async eliminarLiga(id) {
+    // equipos y productos se borran en cascada (migración 0005): todo o nada.
+    ok(await sb().from('ligas').delete().eq('id', id), 'eliminar liga')
+  },
+  async borrarCarpetas(carpetas) {
+    const bucket = sb().storage.from('fotos')
+    for (const carpeta of carpetas) {
+      const lista = ok(await bucket.list(carpeta, { limit: 100 }), 'listar fotos') ?? []
+      const rutas = lista.filter(a => a.id).map(a => `${carpeta}/${a.name}`)
+      if (rutas.length) ok(await bucket.remove(rutas), 'borrar fotos')
+    }
+  },
+
   async ping() { ok(await sb().from('ajustes').select('id').eq('id', 1), 'ping') },
   async reiniciar() { throw new ErrorNegocio('Solo disponible en modo de prueba.') },
 }

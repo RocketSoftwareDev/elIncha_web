@@ -66,8 +66,13 @@ export interface Repo {
   contarIntentos(clave: string, desde: number): Promise<number>
   registrarIntento(clave: string): Promise<void>
 
+  /** Borra la liga con sus equipos y camisetas en una sola operación. */
+  eliminarLiga(id: string): Promise<void>
+
   /** Devuelve la URL pública de la foto. */
   subirFoto(ruta: string, datos: Uint8Array): Promise<string>
+  /** Borra todas las imágenes dentro de esas carpetas (ej. «productos/abc»). */
+  borrarCarpetas(carpetas: string[]): Promise<void>
 
   /** Mantiene despierta la base (Supabase pausa tras 7 días sin uso). */
   ping(): Promise<void>

@@ -27,6 +27,7 @@ Para ver el estado «sin drop», cierra el drop desde `/admin/drops`.
    - `supabase/migraciones/0002_datos_iniciales.sql` (tipos de prenda, precios, parches, combo, ligas, ajustes)
    - `supabase/migraciones/0003_demo_opcional.sql` *(opcional)* catálogo y drop de demostración
    - `supabase/migraciones/0004_escudos.sql` (escudos de equipos)
+   - `supabase/migraciones/0005_eliminar_en_cascada.sql` (eliminar una liga borra sus equipos y camisetas de una vez)
 
    Imágenes en el bucket `fotos` (las carpetas se crean solas al subir desde el admin):
    `productos/{id}/` fotos de camisetas · `ligas/{id}/` círculo de la liga · `equipos/{id}/` escudo.

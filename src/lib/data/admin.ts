@@ -82,6 +82,55 @@ export async function listarLigas(): Promise<Liga[]> {
   return [...(await catalogo()).ligas].sort((a, b) => a.orden - b.orden)
 }
 
+export async function crearLiga(nombre: string) {
+  const c = await catalogo()
+  if (c.ligas.some(l => l.nombre.toLowerCase() === nombre.toLowerCase())) throw new ErrorNegocio('Ya existe una liga con ese nombre')
+  const base = aSlug(nombre).slice(0, 36) || 'liga'
+  let slug = base
+  for (let n = 2; c.ligas.some(l => l.slug === slug); n++) slug = `${base}-${n}`
+  const orden = Math.max(-1, ...c.ligas.map(l => l.orden)) + 1
+  const liga: Liga = { id: `l-${crypto.randomUUID().slice(0, 8)}`, slug, nombre, foto: '', orden, visible: true }
+  await repo.guardarLiga(liga)
+  return liga
+}
+
+/** Ocultar es lo normal: la liga sale de la tienda pero no se pierde nada. */
+export async function alternarLigaVisible(id: string) {
+  const l = (await catalogo()).ligas.find(x => x.id === id)
+  if (!l) throw new ErrorNegocio('Liga no encontrada')
+  await repo.guardarLiga({ ...l, visible: !l.visible })
+}
+
+/** Lo que se perdería al eliminar: se muestra antes de confirmar. */
+export async function alcanceEliminarLiga(id: string) {
+  const c = await catalogo()
+  const equipos = c.equipos.filter(e => e.ligaId === id)
+  const ids = new Set(equipos.map(e => e.id))
+  return { equipos: equipos.length, camisetas: c.productos.filter(p => ids.has(p.equipoId)).length }
+}
+
+/**
+ * Borra la liga con sus equipos, camisetas e imágenes. Exige escribir el nombre exacto.
+ * Los pedidos anteriores no se tocan (guardan una copia fija de lo pedido).
+ */
+export async function eliminarLiga(id: string, confirmacion: string) {
+  const c = await catalogo()
+  const liga = c.ligas.find(l => l.id === id)
+  if (!liga) throw new ErrorNegocio('Liga no encontrada')
+  if (confirmacion.trim().toLowerCase() !== liga.nombre.toLowerCase()) throw new ErrorNegocio('Escribe el nombre de la liga exactamente para confirmar')
+  const equipos = c.equipos.filter(e => e.ligaId === id)
+  const ids = new Set(equipos.map(e => e.id))
+  const productos = c.productos.filter(p => ids.has(p.equipoId))
+
+  await repo.eliminarLiga(id)
+  // Las imágenes se borran después: si esto fallara, solo quedan archivos sueltos, nunca datos a medias.
+  try {
+    await repo.borrarCarpetas([`ligas/${id}`, ...equipos.map(e => `equipos/${e.id}`), ...productos.map(p => `productos/${p.id}`)])
+  } catch (e) {
+    console.error('[admin] no se pudieron borrar las imágenes de la liga', id, e)
+  }
+}
+
 export async function equiposDeLiga(ligaId: string) {
   return (await catalogo()).equipos.filter(e => e.ligaId === ligaId).sort((a, b) => a.orden - b.orden)
 }
