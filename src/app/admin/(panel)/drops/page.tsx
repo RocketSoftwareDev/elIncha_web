@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { Download, Info, Lock, Plus } from 'lucide-react'
 import Link from 'next/link'
@@ -199,6 +200,8 @@ function AbrirDrop({ hayAbierto }: { hayAbierto: boolean }) {
 }
 
 export default async function DropsPage() {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const drops = await listarDrops()
   const abierto = drops.find(d => d.estado === 'abierto')
   const editable = abierto ?? drops[0]

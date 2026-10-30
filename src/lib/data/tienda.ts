@@ -1,83 +1,80 @@
 import 'server-only'
 
-// Datos de la tienda. Hoy salen de la base de prueba en memoria; cuando el back
-// esté arriba, estas mismas funciones llamarán a API_INTERNAL_URL desde el servidor.
+// Datos de la tienda. Salen del repositorio (Supabase en Netlify, memoria en local).
+// Las reglas se aplican aquí, en el servidor: el navegador nunca decide precios.
 
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { aceptaPedidos } from '@/lib/domain/drop'
 import { normalizarNombre, normalizarNumero, validarNombre, validarNumero } from '@/lib/domain/dorsal'
 import { calcularLinea, type Catalogo } from '@/lib/domain/pricing'
-import type { Drop, Pedido, PedidoItem, ProductoVista } from '@/lib/domain/types'
+import type { Drop, PedidoItem, ProductoVista } from '@/lib/domain/types'
 import { armarMensaje, enlaceWhatsapp } from '@/lib/domain/whatsapp'
-import { db } from './mock-db'
+import { catalogo, repo, type DatosCatalogo } from './repo'
 
 export async function dropActual(): Promise<Drop | null> {
-  return db.drops.find(d => d.estado === 'abierto') ?? null
+  return (await catalogo()).drops.find(d => d.estado === 'abierto') ?? null
 }
 
 export async function ajustesPublicos() {
-  return db.ajustes
+  return (await catalogo()).ajustes
 }
 
 export async function ligasVisibles() {
-  return db.ligas.filter(l => l.visible).sort((a, b) => a.orden - b.orden)
+  return (await catalogo()).ligas.filter(l => l.visible).sort((a, b) => a.orden - b.orden)
 }
 
 export async function tipos() {
-  return [...db.tipos].sort((a, b) => a.orden - b.orden)
+  return [...(await catalogo()).tipos].sort((a, b) => a.orden - b.orden)
 }
 
 export async function combosActivos() {
-  return db.combos.filter(c => c.activo)
+  return (await catalogo()).combos.filter(c => c.activo)
 }
 
-function vista(id: string): ProductoVista | null {
-  const p = db.productos.find(x => x.id === id)
+function vista(c: DatosCatalogo, id: string): ProductoVista | null {
+  const p = c.productos.find(x => x.id === id)
   if (!p) return null
-  const equipo = db.equipos.find(e => e.id === p.equipoId)!
-  const liga = db.ligas.find(l => l.id === equipo.ligaId)!
-  const tipo = db.tipos.find(t => t.id === p.tipoId)!
-  const parches = db.parches.filter(x => x.activo && p.parchesPermitidos.includes(x.id))
+  const equipo = c.equipos.find(e => e.id === p.equipoId)
+  const liga = equipo && c.ligas.find(l => l.id === equipo.ligaId)
+  const tipo = c.tipos.find(t => t.id === p.tipoId)
+  if (!equipo || !liga || !tipo) return null
+  const parches = c.parches.filter(x => x.activo && p.parchesPermitidos.includes(x.id))
   return { ...p, equipo, liga, tipo, parches, precio: p.precioEspecial ?? tipo.precio }
-}
-
-export async function vitrina(ligaSlug?: string): Promise<ProductoVista[]> {
-  return db.productos
-    .filter(p => p.visible)
-    .map(p => vista(p.id)!)
-    .filter(p => p.liga.visible && (!ligaSlug || p.liga.slug === ligaSlug))
-    .sort((a, b) => Number(b.destacado) - Number(a.destacado) || a.equipo.orden - b.equipo.orden)
 }
 
 /** Todo el catálogo visible; /vitrina filtra con `buscar` (lib/domain/vitrina). */
 export async function catalogoVisible(): Promise<ProductoVista[]> {
-  return db.productos
+  const c = await catalogo()
+  return c.productos
     .filter(p => p.visible)
-    .map(p => vista(p.id)!)
-    .filter(p => p.liga.visible)
+    .map(p => vista(c, p.id))
+    .filter((p): p is ProductoVista => !!p && p.liga.visible)
 }
 
 export async function equiposVisibles() {
-  return [...db.equipos].sort((a, b) => a.orden - b.orden)
+  return [...(await catalogo()).equipos].sort((a, b) => a.orden - b.orden)
 }
 
 export async function productoPorSlug(slug: string): Promise<ProductoVista | null> {
-  const p = db.productos.find(x => x.slug === slug && x.visible)
-  return p ? vista(p.id) : null
+  const c = await catalogo()
+  const p = c.productos.find(x => x.slug === slug && x.visible)
+  return p ? vista(c, p.id) : null
 }
 
 /** El short del mismo equipo, para armar el combo desde la ficha de la camiseta. */
 export async function shortDelEquipo(equipoId: string): Promise<ProductoVista | null> {
-  const s = db.productos.find(p => p.equipoId === equipoId && p.visible && db.tipos.find(t => t.id === p.tipoId)?.esShort)
-  return s ? vista(s.id) : null
+  const c = await catalogo()
+  const s = c.productos.find(p => p.equipoId === equipoId && p.visible && c.tipos.find(t => t.id === p.tipoId)?.esShort)
+  return s ? vista(c, s.id) : null
 }
 
-export function catalogo(): Catalogo {
+function catalogoPrecios(c: DatosCatalogo): Catalogo {
   return {
-    productos: new Map(db.productos.map(p => [p.id, p])),
-    tipos: new Map(db.tipos.map(t => [t.id, t])),
-    parches: new Map(db.parches.map(p => [p.id, p])),
-    combos: new Map(db.combos.map(c => [c.id, c])),
+    productos: new Map(c.productos.map(p => [p.id, p])),
+    tipos: new Map(c.tipos.map(t => [t.id, t])),
+    parches: new Map(c.parches.map(p => [p.id, p])),
+    combos: new Map(c.combos.map(x => [x.id, x])),
   }
 }
 
@@ -110,15 +107,25 @@ export type ResultadoPedido =
   | { ok: true; codigo: string; total: number; reserva: number; whatsappUrl: string }
   | { ok: false; error: string }
 
-export async function crearPedido(entrada: unknown): Promise<ResultadoPedido> {
+/** Límite contra pedidos falsos en ráfaga: 4 cada 10 minutos por visitante. */
+const MAX_PEDIDOS = 4
+const VENTANA = 10 * 60 * 1000
+
+export async function crearPedido(entrada: unknown, contexto: { ip: string }): Promise<ResultadoPedido> {
   const parsed = pedidoSchema.safeParse(entrada)
   if (!parsed.success) return { ok: false, error: 'Revisa tus datos: nombre, WhatsApp y sector son obligatorios.' }
   const { cliente, whatsapp, sector, lineas } = parsed.data
 
-  const drop = await dropActual()
+  const clave = `pedido:${createHash('sha256').update(contexto.ip).digest('hex').slice(0, 16)}`
+  if ((await repo.contarIntentos(clave, Date.now() - VENTANA)) >= MAX_PEDIDOS) {
+    return { ok: false, error: 'Recibimos varios pedidos seguidos desde aquí. Espera unos minutos o escríbenos por WhatsApp.' }
+  }
+
+  const c = await catalogo()
+  const drop = c.drops.find(d => d.estado === 'abierto') ?? null
   if (!aceptaPedidos(drop, Date.now())) return { ok: false, error: 'No hay un drop abierto. Pronto realizaremos otro drop.' }
 
-  const cat = catalogo()
+  const cat = catalogoPrecios(c)
   const items: PedidoItem[] = []
   for (const l of lineas) {
     const producto = cat.productos.get(l.productoId)
@@ -140,7 +147,8 @@ export async function crearPedido(entrada: unknown): Promise<ResultadoPedido> {
     } catch {
       return { ok: false, error: 'Una de las opciones ya no está disponible.' }
     }
-    const v = vista(producto.id)!
+    const v = vista(c, producto.id)
+    if (!v) return { ok: false, error: 'Una de las prendas ya no está disponible.' }
     const combo = l.comboId ? cat.combos.get(l.comboId) : undefined
     items.push({
       id: crypto.randomUUID(),
@@ -160,15 +168,14 @@ export async function crearPedido(entrada: unknown): Promise<ResultadoPedido> {
   }
 
   const total = items.reduce((s, i) => s + i.subtotal, 0)
-  const codigo = `EH-${String(++db.secuenciaPedido).padStart(4, '0')}`
-  const pedido: Pedido = {
-    id: crypto.randomUUID(), codigo, dropId: drop!.id, clienteNombre: cliente, clienteWhatsapp: whatsapp, sector,
-    total, reserva: db.ajustes.montoReserva, estado: 'por_confirmar', creadoEn: new Date().toISOString(), items,
-  }
-  db.pedidos.unshift(pedido)
+  const reserva = Math.min(c.ajustes.montoReserva, total)
+  await repo.registrarIntento(clave)
+  const { codigo } = await repo.crearPedido({
+    dropId: drop!.id, clienteNombre: cliente, clienteWhatsapp: whatsapp, sector, total, reserva, estado: 'por_confirmar', items,
+  })
 
   const mensaje = armarMensaje({
-    saludo: db.ajustes.saludo,
+    saludo: c.ajustes.saludo,
     drop: drop!.nombre,
     lineas: items.map(i => ({
       cantidad: i.cantidad,
@@ -178,13 +185,13 @@ export async function crearPedido(entrada: unknown): Promise<ResultadoPedido> {
       dorsal: describirDorsal(i),
     })),
     total,
-    reserva: pedido.reserva,
+    reserva,
     cliente,
     sector,
     codigo,
   })
 
-  return { ok: true, codigo, total, reserva: pedido.reserva, whatsappUrl: enlaceWhatsapp(db.ajustes.whatsapp, mensaje) }
+  return { ok: true, codigo, total, reserva, whatsappUrl: enlaceWhatsapp(c.ajustes.whatsapp, mensaje) }
 }
 
 export function describirDorsal(i: Pick<PedidoItem, 'dorsalNombre' | 'dorsalNumero' | 'shortNumero' | 'parches'>): string | undefined {

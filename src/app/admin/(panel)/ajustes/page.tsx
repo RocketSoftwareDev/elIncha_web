@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { FacebookLogo, InstagramLogo, TiktokLogo, WhatsappLogo } from '@phosphor-icons/react/dist/ssr'
 import { Banknote, Clock3, DollarSign, Landmark, Smartphone, type LucideIcon } from 'lucide-react'
@@ -21,6 +22,8 @@ function ConIcono({ icono, children }: { icono: React.ReactNode; children: React
 }
 
 export default async function AjustesPage() {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const a = await leerAjustes()
   const activos = a.metodosPago.filter(m => m.activo).map(m => m.nombre.split(' /')[0])
 

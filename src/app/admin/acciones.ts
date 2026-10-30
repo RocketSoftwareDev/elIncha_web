@@ -1,13 +1,15 @@
 'use server'
 
-// Acciones del admin. Validan con zod y delegan en src/lib/data/admin.ts;
-// cuando exista el back, admin.ts llamará a la API y estas acciones no cambian.
+// Acciones del admin. Cada una verifica la sesión ANTES de todo (las acciones de
+// servidor son endpoints públicos), valida con zod y delega en src/lib/data/admin.ts.
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { inputAIso } from '@/components/admin/fechas'
+import { requerirAdmin } from '@/lib/auth/sesion'
 import * as admin from '@/lib/data/admin'
+import { ErrorNegocio } from '@/lib/data/repo'
 import type { EstadoPedido } from '@/lib/domain/types'
 
 export type Resultado = { ok?: string; error?: string } | null
@@ -18,7 +20,9 @@ const marcado = (f: FormData, k: string) => f.get(k) === 'on'
 
 function errorDe(e: unknown): string {
   if (e instanceof z.ZodError) return e.issues[0]?.message ?? 'Datos inválidos'
-  return e instanceof Error ? e.message : 'Algo salió mal'
+  if (e instanceof ErrorNegocio) return e.message
+  console.error('[admin]', e)
+  return 'No se pudo guardar. Intenta de nuevo en un momento.'
 }
 
 function refrescar() {
@@ -46,6 +50,7 @@ function leerDrop(f: FormData) {
 }
 
 export async function guardarDropAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     const id = z.string().min(1).parse(f.get('id'))
     await admin.guardarDrop(id, { ...leerDrop(f), mostrarCuentaRegresiva: marcado(f, 'mostrarCuentaRegresiva') })
@@ -57,6 +62,7 @@ export async function guardarDropAccion(_: Resultado, f: FormData): Promise<Resu
 }
 
 export async function abrirDropAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     await admin.abrirDrop(leerDrop(f))
   } catch (e) {
@@ -67,6 +73,7 @@ export async function abrirDropAccion(_: Resultado, f: FormData): Promise<Result
 }
 
 export async function cerrarDropAccion(f: FormData) {
+  await requerirAdmin()
   await admin.cambiarEstadoDrop(z.string().min(1).parse(f.get('id')), 'cerrado')
   refrescar()
 }
@@ -76,6 +83,7 @@ export async function cerrarDropAccion(f: FormData) {
 const estadoPedido = z.enum(['por_confirmar', 'reserva_pagada', 'pagado', 'entregado', 'cancelado'])
 
 export async function estadoPedidoAccion(f: FormData) {
+  await requerirAdmin()
   const codigo = z.string().regex(/^EH-\d+$/).parse(f.get('codigo'))
   const estado: EstadoPedido = estadoPedido.parse(f.get('estado'))
   await admin.cambiarEstadoPedido(codigo, estado)
@@ -93,6 +101,9 @@ const productoSchema = z.object({
 })
 
 export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  let guardado: { id: string } | null = null
+  const eraNueva = !f.get('id')
   try {
     const d = productoSchema.parse({
       id: f.get('id') || undefined,
@@ -102,7 +113,7 @@ export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<
       precioEspecial: f.get('precioEspecial') ?? '',
     })
     const existente = d.id ? await admin.productoPorId(d.id) : null
-    await admin.guardarProducto({
+    guardado = await admin.guardarProducto({
       id: d.id,
       equipoId: d.equipoId,
       tipoId: d.tipoId,
@@ -118,17 +129,53 @@ export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<
     return { error: errorDe(e) }
   }
   refrescar()
-  redirect('/admin/productos')
+  // Una camiseta nueva queda abierta para subirle las fotos enseguida.
+  redirect(eraNueva && guardado ? `/admin/productos/${guardado.id}` : '/admin/productos')
 }
 
 export async function alternarVisibleAccion(f: FormData) {
+  await requerirAdmin()
   await admin.alternarVisible(z.string().min(1).parse(f.get('id')))
+  refrescar()
+}
+
+// ---------- Fotos ----------
+
+const MAX_FOTO = 1_500_000 // el navegador ya la reduce a 1200 px en WebP
+
+/** Revisa el contenido real del archivo (RIFF....WEBP), no lo que diga el navegador. */
+function esWebp(b: Uint8Array) {
+  const t = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n))
+  return b.length > 12 && t(0, 4) === 'RIFF' && t(8, 4) === 'WEBP'
+}
+
+export async function subirFotoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    const productoId = z.string().min(1).max(64).parse(f.get('productoId'))
+    const archivo = f.get('foto')
+    if (!(archivo instanceof Blob) || archivo.size === 0) throw new ErrorNegocio('Elige una foto')
+    if (archivo.size > MAX_FOTO) throw new ErrorNegocio('La foto pesa demasiado (máx. 1,5 MB)')
+    const datos = new Uint8Array(await archivo.arrayBuffer())
+    if (!esWebp(datos)) throw new ErrorNegocio('Formato no válido')
+    await admin.agregarFoto(productoId, datos)
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Foto agregada' }
+}
+
+export async function quitarFotoAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.quitarFoto(z.string().min(1).parse(f.get('productoId')), z.string().url().or(z.string().startsWith('/')).parse(f.get('url')))
   refrescar()
 }
 
 // ---------- Ligas y equipos ----------
 
 export async function crearEquipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     const ligaId = z.string().min(1).parse(f.get('ligaId'))
     const nombre = z.string().trim().min(2, 'Escribe el nombre del equipo').max(50).parse(f.get('nombre'))
@@ -145,6 +192,7 @@ export async function crearEquipoAccion(_: Resultado, f: FormData): Promise<Resu
 const precio = z.coerce.number().positive('Los precios deben ser mayores a 0').max(1000)
 
 export async function guardarPreciosAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     for (const t of await admin.listarTipos()) {
       await admin.guardarTipo(t.id, {
@@ -164,6 +212,7 @@ export async function guardarPreciosAccion(_: Resultado, f: FormData): Promise<R
 }
 
 export async function crearComboAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     await admin.guardarCombo({
       nombre: z.string().trim().min(3, 'Escribe el nombre del combo').max(40).parse(f.get('nombre')),
@@ -179,6 +228,7 @@ export async function crearComboAccion(_: Resultado, f: FormData): Promise<Resul
 }
 
 export async function crearParcheAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     const nombre = z.string().trim().min(3, 'Escribe el nombre del parche').max(40).parse(f.get('nombre'))
     const actual = (await admin.listarParches())[0]?.precio ?? 1
@@ -195,6 +245,7 @@ export async function crearParcheAccion(_: Resultado, f: FormData): Promise<Resu
 const texto = (max: number) => z.string().trim().min(1, 'Hay campos vacíos').max(max)
 
 export async function guardarAjustesAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
   try {
     const actuales = await admin.leerAjustes()
     await admin.guardarAjustes({
@@ -220,6 +271,7 @@ export async function guardarAjustesAccion(_: Resultado, f: FormData): Promise<R
 // ---------- Modo de prueba ----------
 
 export async function reiniciarAccion() {
+  await requerirAdmin()
   await admin.reiniciar()
   refrescar()
 }

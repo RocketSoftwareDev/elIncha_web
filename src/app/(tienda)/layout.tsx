@@ -6,6 +6,9 @@ import { ajustesPublicos, dropActual } from '@/lib/data/tienda'
 import { RegistroVistas } from '@/lib/analitica/Registro'
 import { ahora } from '@/lib/reloj'
 
+// Cada visita lee el catálogo y el drop vigentes: nada se congela al compilar.
+export const dynamic = 'force-dynamic'
+
 export default async function TiendaLayout({ children }: { children: React.ReactNode }) {
   const [drop, ajustes] = await Promise.all([dropActual(), ajustesPublicos()])
   const abierto = aceptaPedidos(drop, ahora())

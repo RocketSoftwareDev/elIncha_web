@@ -1,0 +1,22 @@
+# El Hincha en Netlify (etapa gratis). Netlify detecta Next.js y arma el servidor solo.
+# Los secretos NO van aquí: se cargan en Site configuration → Environment variables
+# (ver README, sección «Publicar en Netlify»).
+
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Las fotos de muestra y la marca no cambian: que el navegador las guarde un año.
+[[headers]]
+  for = "/mock/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/brand/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

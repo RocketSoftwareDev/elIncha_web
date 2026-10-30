@@ -28,3 +28,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+# Herramientas locales
+.playwright-mcp/
+.netlify/

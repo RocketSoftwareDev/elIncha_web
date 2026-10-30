@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -15,6 +16,8 @@ type Orden = 'vistas' | 'pedidas' | 'conversion'
 const num = (n: number) => n.toLocaleString('es-EC')
 
 export default async function Resumen({ searchParams }: Props) {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const p = await searchParams
   const rango: Rango = RANGOS.some(r => r.valor === p.rango) ? (p.rango as Rango) : 'drop'
   const orden: Orden = p.orden === 'pedidas' || p.orden === 'conversion' ? p.orden : 'vistas'

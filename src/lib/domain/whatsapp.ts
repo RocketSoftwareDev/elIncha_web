@@ -40,7 +40,10 @@ export function armarMensaje(d: DatosMensaje): string {
   ].join('\n')
 }
 
-/** Solo dígitos: wa.me no acepta "+", espacios ni guiones. */
+/**
+ * Enlace directo a api.whatsapp.com: la redirección de wa.me daña algunos emojis
+ * (⚽ llega como «�»). El número va solo en dígitos, sin "+", espacios ni guiones.
+ */
 export function enlaceWhatsapp(numero: string, mensaje: string): string {
-  return `https://wa.me/${numero.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje)}`
+  return `https://api.whatsapp.com/send?phone=${numero.replace(/\D/g, '')}&text=${encodeURIComponent(mensaje)}`
 }
