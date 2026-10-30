@@ -1,11 +1,12 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { Check, Search } from 'lucide-react'
 import { useState } from 'react'
 import { normalizar } from '@/lib/domain/vitrina'
 
-interface EquipoFiltro { id: string; nombre: string; cantidad: number; marcado: boolean; href: string }
+interface EquipoFiltro { id: string; nombre: string; escudo: string; cantidad: number; marcado: boolean; href: string }
 
 const VISIBLES = 6
 
@@ -29,6 +30,7 @@ export function FiltroEquipos({ equipos }: { equipos: EquipoFiltro[] }) {
           <span className={`grid size-[18px] shrink-0 place-items-center border ${e.marcado ? 'border-sky bg-sky' : 'border-white/25'}`} aria-hidden>
             {e.marcado && <Check size={12} className="text-navy-950" strokeWidth={3} />}
           </span>
+          {e.escudo && <Image src={e.escudo} alt="" width={20} height={20} className="size-5 shrink-0 object-contain" />}
           <span className={`flex-1 text-sm ${e.marcado ? 'font-semibold text-white' : 'text-[#d6def0]'}`}>{e.nombre}</span>
           <span className="font-mono text-[11px] text-muted">{e.cantidad}</span>
         </Link>

@@ -97,7 +97,7 @@ export async function productoPorId(id: string): Promise<Producto | null> {
 export async function crearEquipo(ligaId: string, nombre: string) {
   const c = await catalogo()
   if (!c.ligas.some(l => l.id === ligaId)) throw new ErrorNegocio('Liga no encontrada')
-  await repo.crearEquipo({ id: crypto.randomUUID(), ligaId, nombre, orden: c.equipos.length })
+  await repo.guardarEquipo({ id: crypto.randomUUID(), ligaId, nombre, orden: c.equipos.length, escudo: '' })
 }
 
 export async function listarProductos() {
@@ -151,6 +151,30 @@ export async function quitarFoto(productoId: string, url: string) {
   const p = (await catalogo()).productos.find(x => x.id === productoId)
   if (!p) throw new ErrorNegocio('Producto no encontrado')
   await repo.guardarProducto({ ...p, fotos: p.fotos.filter(f => f !== url) })
+}
+
+// ---------- Imágenes de ligas y escudos ----------
+// Cada imagen nueva va con nombre único: así el navegador nunca muestra la vieja en caché.
+
+/** El círculo de la liga en el inicio y en la vitrina. */
+export async function cambiarImagenLiga(ligaId: string, datos: Uint8Array) {
+  const l = (await catalogo()).ligas.find(x => x.id === ligaId)
+  if (!l) throw new ErrorNegocio('Liga no encontrada')
+  const url = await repo.subirFoto(`ligas/${l.id}/${crypto.randomUUID()}.webp`, datos)
+  await repo.guardarLiga({ ...l, foto: url })
+}
+
+export async function cambiarEscudo(equipoId: string, datos: Uint8Array) {
+  const e = (await catalogo()).equipos.find(x => x.id === equipoId)
+  if (!e) throw new ErrorNegocio('Equipo no encontrado')
+  const url = await repo.subirFoto(`equipos/${e.id}/${crypto.randomUUID()}.webp`, datos)
+  await repo.guardarEquipo({ ...e, escudo: url })
+}
+
+export async function quitarEscudo(equipoId: string) {
+  const e = (await catalogo()).equipos.find(x => x.id === equipoId)
+  if (!e) throw new ErrorNegocio('Equipo no encontrado')
+  await repo.guardarEquipo({ ...e, escudo: '' })
 }
 
 // ---------- Precios, combos, parches ----------

@@ -47,7 +47,7 @@ const num = (v: unknown) => Number(v)
 type Fila = Record<string, unknown>
 
 const aLiga = (f: Fila): Liga => ({ id: f.id as string, slug: f.slug as string, nombre: f.nombre as string, foto: f.foto as string, orden: f.orden as number, visible: f.visible as boolean })
-const aEquipo = (f: Fila): Equipo => ({ id: f.id as string, ligaId: f.liga_id as string, nombre: f.nombre as string, orden: f.orden as number })
+const aEquipo = (f: Fila): Equipo => ({ id: f.id as string, ligaId: f.liga_id as string, nombre: f.nombre as string, orden: f.orden as number, escudo: (f.escudo as string) ?? '' })
 const aTipo = (f: Fila): TipoPrenda => ({ id: f.id as string, nombre: f.nombre as string, precio: num(f.precio), tallas: f.tallas as string[], aceptaPersonalizacion: f.acepta_personalizacion as boolean, esShort: f.es_short as boolean, orden: f.orden as number })
 const aParche = (f: Fila): Parche => ({ id: f.id as string, nombre: f.nombre as string, precio: num(f.precio), activo: f.activo as boolean })
 const aCombo = (f: Fila): Combo => ({ id: f.id as string, nombre: f.nombre as string, precio: num(f.precio), activo: f.activo as boolean, tipos: f.tipos as string[] })
@@ -127,7 +127,8 @@ export const repoSupabase: Repo = {
   },
 
   async guardarDrop(d) { ok(await sb().from('drops').upsert(deDrop(d)), 'drop') },
-  async crearEquipo(e) { ok(await sb().from('equipos').insert({ id: e.id, liga_id: e.ligaId, nombre: e.nombre, orden: e.orden }), 'equipo') },
+  async guardarLiga(l) { ok(await sb().from('ligas').upsert({ id: l.id, slug: l.slug, nombre: l.nombre, foto: l.foto, orden: l.orden, visible: l.visible }), 'liga') },
+  async guardarEquipo(e) { ok(await sb().from('equipos').upsert({ id: e.id, liga_id: e.ligaId, nombre: e.nombre, orden: e.orden, escudo: e.escudo }), 'equipo') },
   async guardarProducto(p) { ok(await sb().from('productos').upsert(deProducto(p)), 'producto') },
   async guardarTipo(t) {
     ok(await sb().from('tipos_prenda').upsert({ id: t.id, nombre: t.nombre, precio: t.precio, tallas: t.tallas, acepta_personalizacion: t.aceptaPersonalizacion, es_short: t.esShort, orden: t.orden }), 'tipo')

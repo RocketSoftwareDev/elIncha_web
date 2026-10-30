@@ -24,12 +24,15 @@ if (clave !== repetida) {
   process.exit(1)
 }
 
-// Mismo formato que src/lib/auth/clave.ts
+// Mismo cálculo que src/lib/auth/clave.ts
 const sal = randomBytes(16)
 const hash = scryptSync(clave.normalize('NFC'), sal, 32, { N: 16384, r: 8, p: 1 })
 
 console.log('\nCopia estos valores en Netlify → Site configuration → Environment variables')
 console.log('(marca «Contains secret values»). No los guardes en ningún archivo del repo.\n')
-console.log(`ADMIN_PASSWORD_HASH = scrypt$16384$8$1$${sal.toString('base64')}$${hash.toString('base64')}`)
-console.log(`SESSION_SECRET      = ${randomBytes(48).toString('base64url')}`)
+// Formato con «:» (no «$»): el «$» se pierde al pegarlo en .env.local o en una terminal.
+console.log('ADMIN_PASSWORD_HASH (copia SOLO la línea de abajo, completa):')
+console.log(`scrypt:16384:8:1:${sal.toString('base64')}:${hash.toString('base64')}`)
+console.log('\nSESSION_SECRET (copia SOLO la línea de abajo):')
+console.log(randomBytes(48).toString('base64url'))
 console.log('\nSESSION_SECRET solo hace falta crearlo una vez. Cambiar la contraseña cierra todas las sesiones.')

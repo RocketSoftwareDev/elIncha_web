@@ -51,7 +51,8 @@ export interface Repo {
 
   /** Crea o actualiza. Lanza ErrorNegocio si ya hay otro drop abierto. */
   guardarDrop(d: Drop): Promise<void>
-  crearEquipo(e: Equipo): Promise<void>
+  guardarLiga(l: Liga): Promise<void>
+  guardarEquipo(e: Equipo): Promise<void>
   guardarProducto(p: Producto): Promise<void>
   guardarTipo(t: TipoPrenda): Promise<void>
   guardarCombo(c: Combo): Promise<void>

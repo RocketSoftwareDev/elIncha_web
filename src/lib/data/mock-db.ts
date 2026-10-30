@@ -36,7 +36,7 @@ function semilla(): MockDb {
     ['emelec', 'nacionales', 'Emelec'], ['bsc', 'nacionales', 'Barcelona SC'], ['ldu', 'nacionales', 'Liga de Quito'],
     ['brasil', 'brasil-argentina', 'Brasil'], ['argentina', 'brasil-argentina', 'Argentina'],
     ['ecuador', 'retro', 'Ecuador'], ['hincha', 'musculeras', 'El Hincha'],
-  ].map(([id, liga, nombre], i) => ({ id: `e-${id}`, ligaId: `l-${liga}`, nombre, orden: i }))
+  ].map(([id, liga, nombre], i) => ({ id: `e-${id}`, ligaId: `l-${liga}`, nombre, orden: i, escudo: '' }))
 
   const tipos: TipoPrenda[] = [
     ['player', 'Camiseta Player', 40, true, false], ['retro', 'Retro', 38, true, false], ['buzo', 'Buzo', 40, false, false],

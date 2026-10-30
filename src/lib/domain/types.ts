@@ -36,6 +36,8 @@ export interface Equipo {
   ligaId: Id
   nombre: string
   orden: number
+  /** URL del escudo (WebP con transparencia) o '' si todavía no tiene. */
+  escudo: string
 }
 
 export interface TipoPrenda {

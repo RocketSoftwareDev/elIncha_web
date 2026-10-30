@@ -166,6 +166,32 @@ export async function subirFotoAccion(_: Resultado, f: FormData): Promise<Result
   return { ok: 'Foto agregada' }
 }
 
+/** Imagen de liga (círculo de la vitrina) o escudo de equipo. */
+export async function subirImagenAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    const destino = z.enum(['liga', 'equipo']).parse(f.get('destino'))
+    const id = z.string().min(1).max(64).parse(f.get('id'))
+    const archivo = f.get('imagen')
+    if (!(archivo instanceof Blob) || archivo.size === 0) throw new ErrorNegocio('Elige una imagen')
+    if (archivo.size > 600_000) throw new ErrorNegocio('La imagen pesa demasiado')
+    const datos = new Uint8Array(await archivo.arrayBuffer())
+    if (!esWebp(datos)) throw new ErrorNegocio('Formato no válido')
+    if (destino === 'liga') await admin.cambiarImagenLiga(id, datos)
+    else await admin.cambiarEscudo(id, datos)
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Imagen actualizada' }
+}
+
+export async function quitarEscudoAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.quitarEscudo(z.string().min(1).parse(f.get('id')))
+  refrescar()
+}
+
 export async function quitarFotoAccion(f: FormData) {
   await requerirAdmin()
   await admin.quitarFoto(z.string().min(1).parse(f.get('productoId')), z.string().url().or(z.string().startsWith('/')).parse(f.get('url')))

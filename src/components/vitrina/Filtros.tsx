@@ -43,7 +43,7 @@ export function Filtros({ filtros: f, ligas, tipos, equipos, porLiga, porTipo, p
     .filter(e => (porEquipo.get(idCorto(e.id)) ?? 0) > 0 || f.equipos.includes(idCorto(e.id)))
     .map(e => {
       const id = idCorto(e.id)
-      return { id, nombre: e.nombre, cantidad: porEquipo.get(id) ?? 0, marcado: f.equipos.includes(id), href: urlVitrina(f, { equipos: alternar(f.equipos, id) }) }
+      return { id, nombre: e.nombre, escudo: e.escudo, cantidad: porEquipo.get(id) ?? 0, marcado: f.equipos.includes(id), href: urlVitrina(f, { equipos: alternar(f.equipos, id) }) }
     })
 
   return (

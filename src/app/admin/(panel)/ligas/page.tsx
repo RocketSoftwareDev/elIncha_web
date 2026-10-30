@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { crearEquipoAccion } from '@/app/admin/acciones'
 import { BotonEnviar, FormAccion } from '@/components/admin/FormAccion'
 import { Card, PageHeader, boton, input } from '@/components/admin/ui'
-import { listarEquipos, listarLigas, listarProductos } from '@/lib/data/admin'
+import { CambiarImagen } from '@/components/admin/CambiarImagen'
+import { listarEquipos, listarLigas, listarProductos, modoPrueba } from '@/lib/data/admin'
 import { formatoPrecio } from '@/lib/domain/pricing'
 
 export const metadata: Metadata = { title: 'Ligas y equipos' }
@@ -18,6 +19,7 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
   await requerirAdmin()
   const sp = await searchParams
   const [ligas, equipos, productos] = await Promise.all([listarLigas(), listarEquipos(), listarProductos()])
+  const prueba = modoPrueba()
   const liga = ligas.find(l => l.id === sp.liga) ?? ligas[0]
   const deLiga = equipos.filter(e => e.ligaId === liga?.id)
   const equipo = deLiga.find(e => e.id === sp.equipo) ?? deLiga[0]
@@ -59,13 +61,13 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
 
         {liga && (
           <div className="min-w-0 space-y-5">
-            <Card className="flex flex-wrap items-center gap-4 p-5">
-              <span className="relative h-14 w-14 overflow-hidden rounded-full bg-[#e3ecf8] ring-2 ring-sky">
-                <Image src={liga.foto} alt="" fill sizes="56px" className="object-cover" />
-              </span>
-              <div className="flex-1">
+            <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
+              <div>
                 <h2 className="display text-[30px]">{liga.nombre}</h2>
                 <p className="text-[13px] text-ink-soft">Círculo #{liga.orden + 1} en la vitrina · {deLiga.length} equipos · {opcionesDeLiga} opciones</p>
+              </div>
+              <div className="w-full sm:w-auto sm:max-w-sm">
+                <CambiarImagen key={liga.id + liga.foto} destino="liga" id={liga.id} actual={liga.foto} habilitada={!prueba} />
               </div>
             </Card>
 
@@ -75,7 +77,11 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
                 return (
                   <Link key={e.id} href={`/admin/ligas?liga=${liga.id}&equipo=${e.id}`} aria-current={activo ? 'page' : undefined}
                     className={`flex items-center gap-3 rounded-xl bg-white p-3.5 ${activo ? 'border-2 border-navy-950' : 'border border-line-dark'}`}>
-                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-admin-bg"><Shield size={20} className="text-navy-800" aria-hidden /></span>
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-admin-bg">
+                      {e.escudo
+                        ? <Image src={e.escudo} alt="" fill sizes="40px" className="object-contain p-1" />
+                        : <Shield size={20} className="text-navy-800" aria-hidden />}
+                    </span>
                     <span>
                       <span className="block text-sm font-bold">{e.nombre}</span>
                       <span className="block text-xs text-ink-soft">{productos.filter(p => p.equipoId === e.id).length} opciones</span>
@@ -93,6 +99,10 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
 
             {equipo && (
               <Card className="overflow-hidden">
+                <div className="border-b border-line-dark bg-[#f8fafd] px-5 py-4">
+                  <p className="kicker mb-2 text-[10px] text-ink-soft">Escudo de {equipo.nombre}</p>
+                  <CambiarImagen key={equipo.id + equipo.escudo} destino="equipo" id={equipo.id} actual={equipo.escudo} habilitada={!prueba} />
+                </div>
                 <div className="flex items-center justify-between border-b border-line-dark px-5 py-3.5">
                   <div>
                     <h2 className="text-[15px] font-bold">Opciones de {equipo.nombre}</h2>
