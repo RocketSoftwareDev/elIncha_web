@@ -70,6 +70,19 @@ export interface Producto {
   parchesPermitidos: Id[]
 }
 
+/**
+ * Stock de entrega inmediata (sobrantes): camisetas que ya están en Machala.
+ * Se venden SIN personalizar y aunque no haya drop abierto. Una fila por camiseta y talla.
+ */
+export interface Stock {
+  id: Id
+  productoId: Id
+  talla: string
+  cantidad: number
+  /** null = el precio normal del producto. */
+  precio: number | null
+}
+
 export interface Combo {
   id: Id
   nombre: string
@@ -116,12 +129,15 @@ export interface PedidoItem {
   subtotal: number
   comboId: Id | null
   productoId: Id | null
+  /** Si salió del stock de entrega inmediata (no se fabrica: no va a la lista del proveedor). */
+  stockId?: Id | null
 }
 
 export interface Pedido {
   id: Id
   codigo: string
-  dropId: Id
+  /** null = pedido solo de entrega inmediata (no pertenece a ningún drop). */
+  dropId: Id | null
   clienteNombre: string
   clienteWhatsapp: string
   sector: string
@@ -139,4 +155,6 @@ export interface ProductoVista extends Producto {
   tipo: TipoPrenda
   precio: number
   parches: Parche[]
+  /** Tallas disponibles para entrega inmediata (solo las que tienen unidades). */
+  stock: { id: Id; talla: string; cantidad: number; precio: number }[]
 }

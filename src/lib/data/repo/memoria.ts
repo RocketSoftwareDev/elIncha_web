@@ -3,6 +3,7 @@ import 'server-only'
 // Almacenamiento en memoria para desarrollo local. Se reinicia con el servidor.
 
 import type { Dispositivo, Fuente } from '@/lib/domain/analitica'
+import type { PedidoItem } from '@/lib/domain/types'
 import { db, reiniciarDatos } from '../mock-db'
 import { ErrorNegocio, type EventoGuardado, type Repo } from './tipos'
 
@@ -55,6 +56,24 @@ const g = globalThis as unknown as { __ehEventos?: EventoGuardado[]; __ehIntento
 const eventos = (g.__ehEventos ??= eventosSinteticos())
 const intentos = (g.__ehIntentos ??= [])
 
+const SIN_STOCK = 'Una de las camisetas de entrega inmediata ya se vendió. Revisa tu carrito.'
+
+function apartarStock(items: PedidoItem[]) {
+  const pedidas = items.filter(i => i.stockId)
+  for (const i of pedidas) {
+    const s = db.stock.find(x => x.id === i.stockId)
+    if (!s || s.cantidad < i.cantidad) throw new ErrorNegocio(SIN_STOCK)
+  }
+  for (const i of pedidas) db.stock.find(x => x.id === i.stockId)!.cantidad -= i.cantidad
+}
+
+function devolverStock(items: PedidoItem[]) {
+  for (const i of items) {
+    const s = i.stockId && db.stock.find(x => x.id === i.stockId)
+    if (s) s.cantidad += i.cantidad
+  }
+}
+
 const reemplazar = <T extends { id: string }>(lista: T[], x: T) => {
   const i = lista.findIndex(y => y.id === x.id)
   if (i >= 0) lista[i] = x
@@ -70,6 +89,7 @@ export const repoMemoria: Repo = {
   async pedidos(f = {}) {
     return db.pedidos.filter(p =>
       (!f.dropId || p.dropId === f.dropId) &&
+      (!f.sinDrop || p.dropId === null) &&
       (!f.estado || p.estado === f.estado) &&
       (f.desde === undefined || +new Date(p.creadoEn) >= f.desde) &&
       (f.hasta === undefined || +new Date(p.creadoEn) <= f.hasta))
@@ -78,6 +98,8 @@ export const repoMemoria: Repo = {
     return db.pedidos.find(p => p.codigo === codigo) ?? null
   },
   async crearPedido(p) {
+    // Igual que crear_pedido() en Postgres: aparta todo el stock o no crea nada.
+    apartarStock(p.items)
     const codigo = `EH-${String(++db.secuenciaPedido).padStart(4, '0')}`
     db.pedidos.unshift({ ...p, id: crypto.randomUUID(), codigo, creadoEn: new Date().toISOString() })
     return { codigo }
@@ -85,6 +107,9 @@ export const repoMemoria: Repo = {
   async cambiarEstadoPedido(codigo, estado) {
     const p = db.pedidos.find(x => x.codigo === codigo)
     if (!p) throw new ErrorNegocio('Pedido no encontrado')
+    if (p.estado === estado) return
+    if (estado === 'cancelado') devolverStock(p.items)
+    else if (p.estado === 'cancelado') apartarStock(p.items)
     p.estado = estado
   },
 
@@ -101,6 +126,21 @@ export const repoMemoria: Repo = {
   async guardarCombo(c) { reemplazar(db.combos, c) },
   async guardarParche(p) { reemplazar(db.parches, p) },
   async guardarAjustes(a) { db.ajustes = a },
+  async crearStock(s) {
+    if (db.stock.some(x => x.productoId === s.productoId && x.talla === s.talla)) {
+      throw new ErrorNegocio('Esa camiseta ya tiene stock en esa talla: ajusta la cantidad en la lista.')
+    }
+    db.stock.push(s)
+  },
+  async sumarStock(id, delta) {
+    const s = db.stock.find(x => x.id === id)
+    if (s) s.cantidad = Math.max(0, s.cantidad + delta)
+  },
+  async precioStock(id, precio) {
+    const s = db.stock.find(x => x.id === id)
+    if (s) s.precio = precio
+  },
+  async eliminarStock(id) { db.stock = db.stock.filter(s => s.id !== id) },
 
   async registrarEvento(e) {
     eventos.push(e)
@@ -118,9 +158,19 @@ export const repoMemoria: Repo = {
     while (intentos.length > 5000) intentos.shift()
   },
 
+  async eliminarLiga(id) {
+    const equipos = new Set(db.equipos.filter(e => e.ligaId === id).map(e => e.id))
+    const borrados = new Set(db.productos.filter(p => equipos.has(p.equipoId)).map(p => p.id))
+    db.stock = db.stock.filter(s => !borrados.has(s.productoId))
+    db.productos = db.productos.filter(p => !equipos.has(p.equipoId))
+    db.equipos = db.equipos.filter(e => e.ligaId !== id)
+    db.ligas = db.ligas.filter(l => l.id !== id)
+  },
+
   async subirFoto() {
     throw new ErrorNegocio('En modo de prueba no se suben fotos: configura Supabase.')
   },
+  async borrarCarpetas() {},
   async ping() {},
   async reiniciar() {
     reiniciarDatos()

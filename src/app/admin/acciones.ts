@@ -200,6 +200,37 @@ export async function quitarFotoAccion(f: FormData) {
 
 // ---------- Ligas y equipos ----------
 
+export async function crearLigaAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  let id = ''
+  try {
+    const nombre = z.string().trim().min(2, 'Escribe el nombre de la liga').max(40).parse(f.get('nombre'))
+    id = (await admin.crearLiga(nombre)).id
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  // Queda abierta para subirle su imagen enseguida.
+  redirect(`/admin/ligas?liga=${id}`)
+}
+
+export async function alternarLigaVisibleAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.alternarLigaVisible(z.string().min(1).max(64).parse(f.get('id')))
+  refrescar()
+}
+
+export async function eliminarLigaAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.eliminarLiga(z.string().min(1).max(64).parse(f.get('id')), z.string().max(60).parse(f.get('confirmacion') ?? ''))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  redirect('/admin/ligas')
+}
+
 export async function crearEquipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
   await requerirAdmin()
   try {
@@ -264,6 +295,55 @@ export async function crearParcheAccion(_: Resultado, f: FormData): Promise<Resu
   }
   refrescar()
   return { ok: 'Parche agregado' }
+}
+
+// ---------- Stock de entrega inmediata ----------
+
+// Vacío = el precio normal de la camiseta.
+const precioOpcional = z.preprocess(
+  v => (v === '' || v === null ? null : v),
+  z.coerce.number().positive('El precio debe ser mayor a 0').max(500).nullable(),
+)
+
+export async function agregarStockAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.agregarStock({
+      productoId: z.string().min(1, 'Elige la camiseta').max(64).parse(f.get('productoId')),
+      talla: z.string().min(1, 'Elige la talla').max(4).parse(f.get('talla')),
+      cantidad: z.coerce.number().int('Cantidad inválida').min(1, 'Al menos 1 unidad').max(500).parse(f.get('cantidad')),
+      precio: precioOpcional.parse(f.get('precio')),
+    })
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Stock agregado' }
+}
+
+export async function sumarStockAccion(f: FormData) {
+  await requerirAdmin()
+  const id = z.string().min(1).max(64).parse(f.get('id'))
+  const delta = z.coerce.number().int().min(-500).max(500).parse(f.get('delta'))
+  await admin.sumarStock(id, delta)
+  refrescar()
+}
+
+export async function precioStockAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.precioStock(z.string().min(1).max(64).parse(f.get('id')), precioOpcional.parse(f.get('precio')))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Precio guardado' }
+}
+
+export async function eliminarStockAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.eliminarStock(z.string().min(1).max(64).parse(f.get('id')))
+  refrescar()
 }
 
 // ---------- Ajustes ----------

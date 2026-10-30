@@ -1,9 +1,10 @@
 import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
-import { ChevronRight, GripVertical, Plus, Shield } from 'lucide-react'
+import { ChevronRight, Eye, EyeOff, GripVertical, Plus, Shield } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { crearEquipoAccion } from '@/app/admin/acciones'
+import { alternarLigaVisibleAccion, crearEquipoAccion, crearLigaAccion } from '@/app/admin/acciones'
+import { EliminarLiga } from '@/components/admin/EliminarLiga'
 import { BotonEnviar, FormAccion } from '@/components/admin/FormAccion'
 import { Card, PageHeader, boton, input } from '@/components/admin/ui'
 import { CambiarImagen } from '@/components/admin/CambiarImagen'
@@ -42,13 +43,16 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
               return (
                 <li key={l.id}>
                   <Link href={`/admin/ligas?liga=${l.id}`} aria-current={activa ? 'page' : undefined}
-                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${activa ? 'bg-navy-950 text-white' : 'hover:bg-admin-bg'}`}>
+                    className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${activa ? 'bg-navy-950 text-white' : 'hover:bg-admin-bg'} ${l.visible ? '' : 'opacity-60'}`}>
                     <GripVertical size={14} className={activa ? 'text-[#5b6b95]' : 'text-[#b6c0d6]'} aria-hidden />
-                    <span className={`relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#e3ecf8] ${activa ? 'ring-2 ring-sky' : ''}`}>
-                      <Image src={l.foto} alt="" fill sizes="36px" className="object-cover" />
+                    <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[#e3ecf8] ${activa ? 'ring-2 ring-sky' : ''}`}>
+                      {l.foto ? <Image src={l.foto} alt="" fill sizes="36px" className="object-cover" /> : <Shield size={16} className="text-navy-800" aria-hidden />}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold">{l.nombre}</span>
+                      <span className="flex items-center gap-1.5 text-sm font-semibold">
+                        {l.nombre}
+                        {!l.visible && <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800"><EyeOff size={10} aria-hidden /> Oculta</span>}
+                      </span>
                       <span className={`block text-xs ${activa ? 'text-muted' : 'text-ink-soft'}`}>{equipos.filter(e => e.ligaId === l.id).length} equipos</span>
                     </span>
                     <ChevronRight size={16} className={activa ? 'text-sky' : 'text-[#b6c0d6]'} aria-hidden />
@@ -57,18 +61,37 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
               )
             })}
           </ul>
+          <FormAccion accion={crearLigaAccion} className="space-y-2 border-t border-line-dark p-3">
+            <label className="sr-only" htmlFor="nueva-liga">Nombre de la nueva liga</label>
+            <input id="nueva-liga" name="nombre" placeholder="Nueva liga (ej. Serie A)" required maxLength={40} className={input} />
+            <BotonEnviar className={`${boton.claro} w-full py-2`}><Plus size={14} aria-hidden /> Agregar liga</BotonEnviar>
+          </FormAccion>
         </Card>
 
         {liga && (
           <div className="min-w-0 space-y-5">
-            <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
-              <div>
-                <h2 className="display text-[30px]">{liga.nombre}</h2>
-                <p className="text-[13px] text-ink-soft">Círculo #{liga.orden + 1} en la vitrina · {deLiga.length} equipos · {opcionesDeLiga} opciones</p>
+            <Card className="space-y-4 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="display text-[30px]">{liga.nombre}</h2>
+                  <p className="text-[13px] text-ink-soft">Círculo #{liga.orden + 1} en la vitrina · {deLiga.length} equipos · {opcionesDeLiga} opciones</p>
+                </div>
+                <div className="w-full sm:w-auto sm:max-w-sm">
+                  <CambiarImagen key={liga.id + liga.foto} destino="liga" id={liga.id} actual={liga.foto} habilitada={!prueba} />
+                </div>
               </div>
-              <div className="w-full sm:w-auto sm:max-w-sm">
-                <CambiarImagen key={liga.id + liga.foto} destino="liga" id={liga.id} actual={liga.foto} habilitada={!prueba} />
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-dark pt-4">
+                <form action={alternarLigaVisibleAccion} className="flex items-center gap-3">
+                  <input type="hidden" name="id" value={liga.id} />
+                  <span className="text-sm">
+                    {liga.visible
+                      ? <><Eye size={14} className="mr-1 inline text-green-700" aria-hidden />Visible en la tienda</>
+                      : <><EyeOff size={14} className="mr-1 inline text-amber-700" aria-hidden />Oculta: no aparece en la tienda</>}
+                  </span>
+                  <button type="submit" className={`${boton.claro} py-2`}>{liga.visible ? 'Ocultar' : 'Mostrar en la tienda'}</button>
+                </form>
               </div>
+              <EliminarLiga key={liga.id} id={liga.id} nombre={liga.nombre} equipos={deLiga.length} camisetas={opcionesDeLiga} />
             </Card>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">

@@ -1,12 +1,14 @@
 // Cálculo de precios. En la web sirve para mostrar; el back recalcula todo
 // con los precios de la base y es el que manda.
 
-import type { Combo, Parche, Personalizacion, Producto, TipoPrenda } from './types'
+import type { Combo, Parche, Personalizacion, Producto, Stock, TipoPrenda } from './types'
 
 export interface LineaCarrito {
   key: string
   productoId: string
   comboId: string | null
+  /** Entrega inmediata: sale de esta fila de stock, sin personalizar. */
+  stockId: string | null
   talla: string
   cantidad: number
   personalizacion: Personalizacion
@@ -17,6 +19,14 @@ export interface Catalogo {
   tipos: Map<string, TipoPrenda>
   parches: Map<string, Parche>
   combos: Map<string, Combo>
+  stock: Map<string, Stock>
+}
+
+/** Una línea de stock no lleva nombre, número, parches ni combo. */
+export function lineaDeStockValida(l: LineaCarrito, s: Stock | undefined): s is Stock {
+  const p = l.personalizacion
+  return !!s && s.productoId === l.productoId && s.talla === l.talla && !l.comboId &&
+    !p.nombre.trim() && !p.numero && !p.numeroShort && p.parches.length === 0
 }
 
 export interface LineaCalculada {
@@ -43,6 +53,13 @@ export function calcularLinea(linea: LineaCarrito, catalogo: Catalogo): LineaCal
   if (!producto) throw new Error(`Producto desconocido: ${linea.productoId}`)
   const tipo = catalogo.tipos.get(producto.tipoId)
   if (!tipo) throw new Error(`Tipo desconocido: ${producto.tipoId}`)
+
+  if (linea.stockId) {
+    const s = catalogo.stock.get(linea.stockId)
+    if (!lineaDeStockValida(linea, s)) throw new Error(`Stock no válido: ${linea.stockId}`)
+    const unitario = redondear(s.precio ?? precioBase(producto, tipo))
+    return { key: linea.key, unitario, subtotal: redondear(unitario * linea.cantidad), parches: [] }
+  }
 
   const combo = linea.comboId ? catalogo.combos.get(linea.comboId) : undefined
   if (linea.comboId && (!combo || !combo.activo)) throw new Error(`Combo no disponible: ${linea.comboId}`)

@@ -10,7 +10,8 @@ type PropsConfigurador = React.ComponentProps<typeof Configurador>
 /** Galería + formulario compartiendo el dorsal que escribe el cliente. */
 export function FichaProducto({ producto, combo, drop }: { producto: ProductoVista; combo: PropsConfigurador['combo']; drop: PropsConfigurador['drop'] }) {
   return (
-    <DorsalProvider personalizable={producto.tipo.aceptaPersonalizacion}>
+    // Sin drop y con sobrantes, la ficha abre en «entrega inmediata»: sin vista previa del dorsal.
+    <DorsalProvider personalizable={producto.tipo.aceptaPersonalizacion && (!!drop || producto.stock.length === 0)}>
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-16">
         <Galeria
           fotos={producto.fotos}

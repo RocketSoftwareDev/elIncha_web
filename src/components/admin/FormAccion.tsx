@@ -8,10 +8,11 @@ import { Aviso } from './ui'
 type Accion = (previo: Resultado, datos: FormData) => Promise<Resultado>
 
 /** Formulario que muestra el resultado de la acción (ok o error) sin recargar. */
-export function FormAccion({ accion, children, className, id }: { accion: Accion; children: React.ReactNode; className?: string; id?: string }) {
+export function FormAccion({ accion, children, className, id, onReset }: { accion: Accion; children: React.ReactNode; className?: string; id?: string; onReset?: () => void }) {
   const [estado, enviar] = useActionState(accion, null)
+  // React vacía el formulario tras cada envío; onReset permite limpiar también el estado propio.
   return (
-    <form id={id} action={enviar} className={className}>
+    <form id={id} action={enviar} className={className} onReset={onReset}>
       {children}
       {estado?.error && <Aviso tipo="error">{estado.error}</Aviso>}
       {estado?.ok && <Aviso tipo="ok">{estado.ok}</Aviso>}

@@ -3,7 +3,7 @@
 import { Timer } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-export function SelectorDrop({ drops, actual }: { drops: { id: string; nombre: string }[]; actual: string }) {
+export function SelectorDrop({ drops, actual, conInmediata = false }: { drops: { id: string; nombre: string }[]; actual: string; conInmediata?: boolean }) {
   const router = useRouter()
   const ruta = usePathname()
   const params = useSearchParams()
@@ -25,6 +25,8 @@ export function SelectorDrop({ drops, actual }: { drops: { id: string; nombre: s
         {drops.map(d => (
           <option key={d.id} value={d.id}>{d.nombre}</option>
         ))}
+        {/* Pedidos solo de stock: no pertenecen a ningún drop. */}
+        {conInmediata && <option value="inmediata">Entrega inmediata (sin drop)</option>}
       </select>
     </label>
   )

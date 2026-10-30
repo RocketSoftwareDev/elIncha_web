@@ -20,6 +20,8 @@ export interface Filtros {
   tipos: string[] // ids sin prefijo: "player", "retro"…
   equipos: string[] // ids sin prefijo: "bayern"…
   parches: boolean
+  /** Solo camisetas con stock de entrega inmediata. */
+  inmediata: boolean
   orden: Orden
   pagina: number
 }
@@ -38,6 +40,7 @@ export function leerFiltros(p: Record<string, Param>): Filtros {
     tipos: lista(p.tipo),
     equipos: lista(p.equipo),
     parches: p.parches === '1',
+    inmediata: p.inmediata === '1',
     orden,
     pagina,
   }
@@ -52,6 +55,7 @@ export function urlVitrina(f: Filtros, cambios: Partial<Filtros> = {}): string {
   if (n.tipos.length) s.set('tipo', n.tipos.join(','))
   if (n.equipos.length) s.set('equipo', n.equipos.join(','))
   if (n.parches) s.set('parches', '1')
+  if (n.inmediata) s.set('inmediata', '1')
   if (n.orden !== 'destacadas') s.set('orden', n.orden)
   if (n.pagina > 1) s.set('pagina', String(n.pagina))
   const qs = s.toString()
@@ -82,7 +86,8 @@ function aplicar(productos: ProductoVista[], f: Filtros, excepto?: Faceta): Prod
       (excepto === 'ligas' || !f.ligas.length || f.ligas.includes(p.liga.slug)) &&
       (excepto === 'tipos' || !f.tipos.length || f.tipos.includes(corto(p.tipo.id))) &&
       (excepto === 'equipos' || !f.equipos.length || f.equipos.includes(corto(p.equipo.id))) &&
-      (!f.parches || p.parches.length > 0),
+      (!f.parches || p.parches.length > 0) &&
+      (!f.inmediata || p.stock.length > 0),
   )
 }
 

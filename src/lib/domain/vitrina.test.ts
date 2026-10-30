@@ -4,7 +4,7 @@ import { buscar, leerFiltros, urlVitrina, type Filtros } from './vitrina'
 
 const prod = (id: string, equipo: string, liga: string, tipo: string, precio: number, extra: Partial<ProductoVista> = {}): ProductoVista => ({
   id, slug: id, equipoId: `e-${equipo}`, tipoId: `t-${tipo}`, nombre: 'Local', precioEspecial: null, visible: true, destacado: false,
-  fotos: [], parchesPermitidos: [], precio, parches: [],
+  fotos: [], parchesPermitidos: [], precio, parches: [], stock: [],
   equipo: { id: `e-${equipo}`, ligaId: `l-${liga}`, nombre: equipo === 'fcb' ? 'FC Barcelona' : equipo === 'bsc' ? 'Barcelona SC' : equipo === 'bayern' ? 'Bayern Múnich' : equipo, orden: 0, escudo: '' },
   liga: { id: `l-${liga}`, slug: liga, nombre: liga, foto: '', orden: 0, visible: true },
   tipo: { id: `t-${tipo}`, nombre: tipo, precio, tallas: [], aceptaPersonalizacion: true, esShort: tipo === 'short', orden: 0 },
@@ -16,7 +16,7 @@ const catalogo = [
   prod('bsc', 'bsc', 'nacionales', 'player', 40),
   prod('bayern', 'bayern', 'bundesliga', 'player', 40, { parches: [{ id: 'p', nombre: 'UCL', precio: 1, activo: true }] }),
   prod('bayern-short', 'bayern', 'bundesliga', 'short', 20),
-  prod('ec', 'ecuador', 'retro', 'retro', 38),
+  prod('ec', 'ecuador', 'retro', 'retro', 38, { stock: [{ id: 's1', talla: 'L', cantidad: 2, precio: 30 }] }),
 ]
 
 const f = (p: Record<string, string>): Filtros => leerFiltros(p)
@@ -42,6 +42,11 @@ describe('buscar', () => {
 
   it('«solo con parches»', () => {
     expect(buscar(catalogo, f({ parches: '1' })).productos.map(p => p.id)).toEqual(['bayern'])
+  })
+
+  it('«entrega inmediata» deja solo lo que tiene stock', () => {
+    expect(buscar(catalogo, f({ inmediata: '1' })).productos.map(p => p.id)).toEqual(['ec'])
+    expect(urlVitrina(f({}), { inmediata: true })).toBe('/vitrina?inmediata=1')
   })
 
   it('ordena por precio', () => {

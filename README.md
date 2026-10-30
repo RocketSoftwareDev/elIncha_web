@@ -27,6 +27,8 @@ Para ver el estado «sin drop», cierra el drop desde `/admin/drops`.
    - `supabase/migraciones/0002_datos_iniciales.sql` (tipos de prenda, precios, parches, combo, ligas, ajustes)
    - `supabase/migraciones/0003_demo_opcional.sql` *(opcional)* catálogo y drop de demostración
    - `supabase/migraciones/0004_escudos.sql` (escudos de equipos)
+   - `supabase/migraciones/0005_eliminar_en_cascada.sql` (eliminar una liga borra sus equipos y camisetas de una vez)
+   - `supabase/migraciones/0006_stock.sql` (stock de entrega inmediata; **obligatoria**: los pedidos pasan por sus funciones)
 
    Imágenes en el bucket `fotos` (las carpetas se crean solas al subir desde el admin):
    `productos/{id}/` fotos de camisetas · `ligas/{id}/` círculo de la liga · `equipos/{id}/` escudo.
@@ -138,7 +140,14 @@ public/mock/           fotos de muestra
 - **Dorsal:** nombre opcional de hasta 10 caracteres contando espacios, mayúsculas, con Ñ,
   tildes, apóstrofe, punto y guion. Número 0–99 guardado como texto («07» ≠ «7»). El short
   solo lleva número. La vista previa es referencial (silueta genérica y fuente libre).
-- **Drop:** solo uno abierto a la vez (lo garantiza la base). Sin drop, el carrito se bloquea.
+- **Drop:** solo uno abierto a la vez (lo garantiza la base). Sin drop, solo se puede pedir
+  lo de entrega inmediata.
+- **Entrega inmediata (stock):** sobrantes que ya están en Machala, cargados en *Admin →
+  Entrega inmediata* por camiseta y talla, con precio propio opcional. Se venden sin drop y
+  **sin personalizar** (ni nombre, número, parches ni combo). La unidad se aparta al crear el
+  pedido (en una transacción: nunca se vende dos veces la última) y vuelve si el admin cancela
+  el pedido. No van en la lista para el proveedor. Un pedido solo de stock no pertenece a
+  ningún drop: en *Pedidos* se ve con el filtro «Entrega inmediata (sin drop)».
 - **Precios** por tipo de prenda; combos que el cliente elige; parches $1; **reserva fija** $5.
 - **WhatsApp:** el enlace va a `api.whatsapp.com/send` (la redirección de `wa.me` daña el ⚽).
 
