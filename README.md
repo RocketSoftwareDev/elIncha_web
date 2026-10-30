@@ -26,6 +26,10 @@ Para ver el estado «sin drop», cierra el drop desde `/admin/drops`.
    - `supabase/migraciones/0001_esquema.sql` (tablas, RLS cerrado, bucket de fotos, limpieza diaria)
    - `supabase/migraciones/0002_datos_iniciales.sql` (tipos de prenda, precios, parches, combo, ligas, ajustes)
    - `supabase/migraciones/0003_demo_opcional.sql` *(opcional)* catálogo y drop de demostración
+   - `supabase/migraciones/0004_escudos.sql` (escudos de equipos)
+
+   Imágenes en el bucket `fotos` (las carpetas se crean solas al subir desde el admin):
+   `productos/{id}/` fotos de camisetas · `ligas/{id}/` círculo de la liga · `equipos/{id}/` escudo.
 3. **Project Settings → API**: copia la **Project URL** y la llave **service_role**.
 4. **Authentication → Sign In / Providers**: desactiva «Allow new users to sign up» (no se usa
    el login de Supabase; así nadie puede crear cuentas).

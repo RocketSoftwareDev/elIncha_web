@@ -4,23 +4,9 @@ import Image from 'next/image'
 import { ImagePlus, Loader2, X } from 'lucide-react'
 import { useRef, useState, useTransition } from 'react'
 import { quitarFotoAccion, subirFotoAccion } from '@/app/admin/acciones'
+import { aWebp } from '@/lib/imagen-cliente'
 
-const ANCHO = 1200
 const MAX_FOTOS = 6
-
-/** Reduce la foto en el navegador a 1200 px y WebP: sube ~10 veces menos datos. */
-async function aWebp(archivo: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(archivo)
-  const escala = Math.min(1, ANCHO / bitmap.width)
-  const lienzo = document.createElement('canvas')
-  lienzo.width = Math.round(bitmap.width * escala)
-  lienzo.height = Math.round(bitmap.height * escala)
-  lienzo.getContext('2d')!.drawImage(bitmap, 0, 0, lienzo.width, lienzo.height)
-  bitmap.close()
-  const blob = await new Promise<Blob | null>(r => lienzo.toBlob(r, 'image/webp', 0.82))
-  if (!blob || blob.type !== 'image/webp') throw new Error('Este navegador no puede convertir la foto. Usa Chrome o un celular actualizado.')
-  return blob
-}
 
 interface Props {
   productoId: string | null
@@ -42,7 +28,8 @@ export function SubidaFotos({ productoId, fotos, habilitada }: Props) {
       try {
         const f = new FormData()
         f.set('productoId', productoId)
-        f.set('foto', await aWebp(archivo), 'foto.webp')
+        // 1200 px de ancho en WebP: sube ~10 veces menos datos que la foto original.
+        f.set('foto', await aWebp(archivo, { tipo: 'ancho', ancho: 1200 }, 0.82), 'foto.webp')
         setMensaje(await subirFotoAccion(null, f))
       } catch (e) {
         setMensaje({ error: e instanceof Error ? e.message : 'No se pudo subir la foto' })

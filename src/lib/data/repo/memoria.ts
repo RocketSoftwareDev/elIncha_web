@@ -94,7 +94,8 @@ export const repoMemoria: Repo = {
     }
     reemplazar(db.drops, d)
   },
-  async crearEquipo(e) { db.equipos.push(e) },
+  async guardarLiga(l) { reemplazar(db.ligas, l) },
+  async guardarEquipo(e) { reemplazar(db.equipos, e) },
   async guardarProducto(p) { reemplazar(db.productos, p) },
   async guardarTipo(t) { reemplazar(db.tipos, t) },
   async guardarCombo(c) { reemplazar(db.combos, c) },

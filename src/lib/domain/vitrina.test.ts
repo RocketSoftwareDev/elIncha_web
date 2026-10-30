@@ -5,7 +5,7 @@ import { buscar, leerFiltros, urlVitrina, type Filtros } from './vitrina'
 const prod = (id: string, equipo: string, liga: string, tipo: string, precio: number, extra: Partial<ProductoVista> = {}): ProductoVista => ({
   id, slug: id, equipoId: `e-${equipo}`, tipoId: `t-${tipo}`, nombre: 'Local', precioEspecial: null, visible: true, destacado: false,
   fotos: [], parchesPermitidos: [], precio, parches: [],
-  equipo: { id: `e-${equipo}`, ligaId: `l-${liga}`, nombre: equipo === 'fcb' ? 'FC Barcelona' : equipo === 'bsc' ? 'Barcelona SC' : equipo === 'bayern' ? 'Bayern Múnich' : equipo, orden: 0 },
+  equipo: { id: `e-${equipo}`, ligaId: `l-${liga}`, nombre: equipo === 'fcb' ? 'FC Barcelona' : equipo === 'bsc' ? 'Barcelona SC' : equipo === 'bayern' ? 'Bayern Múnich' : equipo, orden: 0, escudo: '' },
   liga: { id: `l-${liga}`, slug: liga, nombre: liga, foto: '', orden: 0, visible: true },
   tipo: { id: `t-${tipo}`, nombre: tipo, precio, tallas: [], aceptaPersonalizacion: true, esShort: tipo === 'short', orden: 0 },
   ...extra,
