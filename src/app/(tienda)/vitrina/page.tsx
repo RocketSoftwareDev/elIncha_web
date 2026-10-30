@@ -28,6 +28,7 @@ export default async function Vitrina({ searchParams }: Props) {
     ...filtros.tipos.map(t => ({ etiqueta: listaTipos.find(x => idCorto(x.id) === t)?.nombre ?? t, href: urlVitrina(filtros, { tipos: alternar(filtros.tipos, t) }) })),
     ...filtros.equipos.map(e => ({ etiqueta: equipos.find(x => idCorto(x.id) === e)?.nombre ?? e, href: urlVitrina(filtros, { equipos: alternar(filtros.equipos, e) }) })),
     ...(filtros.parches ? [{ etiqueta: 'Con parches', href: urlVitrina(filtros, { parches: false }) }] : []),
+    ...(filtros.inmediata ? [{ etiqueta: 'Entrega inmediata', href: urlVitrina(filtros, { inmediata: false }) }] : []),
   ]
   // La búsqueda no va como etiqueta: se borra desde el mismo campo (botón ×).
   const panel = (

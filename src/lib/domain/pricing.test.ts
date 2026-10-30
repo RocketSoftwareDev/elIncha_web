@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calcularLinea, calcularTotal, formatoPrecio, type Catalogo, type LineaCarrito } from './pricing'
-import type { Combo, Parche, Producto, TipoPrenda } from './types'
+import type { Combo, Parche, Producto, Stock, TipoPrenda } from './types'
 
 const player: TipoPrenda = { id: 't-player', nombre: 'Camiseta Player', precio: 40, tallas: [], aceptaPersonalizacion: true, esShort: false, orden: 1 }
 const retro: TipoPrenda = { id: 't-retro', nombre: 'Retro', precio: 38, tallas: [], aceptaPersonalizacion: true, esShort: false, orden: 2 }
@@ -16,16 +16,19 @@ const producto = (p: Partial<Producto>): Producto => ({
 const madrid = producto({ id: 'rm', tipoId: 't-player' })
 const ecuador = producto({ id: 'ec', tipoId: 't-retro', parchesPermitidos: ['p-wc'] })
 const especial = producto({ id: 'esp', precioEspecial: 45 })
+const stockM: Stock = { id: 's-rm-m', productoId: 'rm', talla: 'M', cantidad: 3, precio: null }
+const stockRebajado: Stock = { id: 's-rm-l', productoId: 'rm', talla: 'L', cantidad: 1, precio: 30 }
 
 const catalogo: Catalogo = {
   productos: new Map([madrid, ecuador, especial].map(p => [p.id, p])),
   tipos: new Map([player, retro].map(t => [t.id, t])),
   parches: new Map([champions, mundial].map(p => [p.id, p])),
   combos: new Map([[kit.id, kit]]),
+  stock: new Map([[stockM.id, stockM], [stockRebajado.id, stockRebajado]]),
 }
 
 const linea = (l: Partial<LineaCarrito>): LineaCarrito => ({
-  key: 'k', productoId: 'rm', comboId: null, talla: 'L', cantidad: 1,
+  key: 'k', productoId: 'rm', comboId: null, stockId: null, talla: 'L', cantidad: 1,
   personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [] }, ...l,
 })
 
@@ -52,6 +55,28 @@ describe('calcularLinea', () => {
 
   it('multiplica por la cantidad', () => {
     expect(calcularLinea(linea({ cantidad: 2 }), catalogo).subtotal).toBe(80)
+  })
+})
+
+describe('entrega inmediata (stock)', () => {
+  it('cobra el precio normal si el stock no tiene precio propio', () => {
+    expect(calcularLinea(linea({ stockId: 's-rm-m', talla: 'M' }), catalogo).unitario).toBe(40)
+  })
+
+  it('cobra el precio rebajado del stock', () => {
+    expect(calcularLinea(linea({ stockId: 's-rm-l', talla: 'L', cantidad: 1 }), catalogo).subtotal).toBe(30)
+  })
+
+  it('rechaza nombre, número o parches en una prenda de stock', () => {
+    const conNombre = linea({ stockId: 's-rm-m', talla: 'M', personalizacion: { nombre: 'VERA', numero: '', numeroShort: '', parches: [] } })
+    const conParche = linea({ stockId: 's-rm-m', talla: 'M', personalizacion: { nombre: '', numero: '', numeroShort: '', parches: ['p-ucl'] } })
+    expect(() => calcularLinea(conNombre, catalogo)).toThrow()
+    expect(() => calcularLinea(conParche, catalogo)).toThrow()
+  })
+
+  it('rechaza una talla distinta a la del stock o un combo', () => {
+    expect(() => calcularLinea(linea({ stockId: 's-rm-m', talla: 'XL' }), catalogo)).toThrow()
+    expect(() => calcularLinea(linea({ stockId: 's-rm-m', talla: 'M', comboId: 'c-kit' }), catalogo)).toThrow()
   })
 })
 

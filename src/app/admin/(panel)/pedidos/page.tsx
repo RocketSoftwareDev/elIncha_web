@@ -1,7 +1,7 @@
 import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { WhatsappLogo } from '@phosphor-icons/react/dist/ssr'
-import { CircleCheck, FileSpreadsheet, Package, Shirt } from 'lucide-react'
+import { CircleCheck, FileSpreadsheet, Package, Shirt, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { estadoPedidoAccion } from '@/app/admin/acciones'
 import { ESTADO_PEDIDO, ESTADOS_PEDIDO } from '@/components/admin/estados'
@@ -52,7 +52,11 @@ function Detalle({ pedido, drop }: { pedido: Pedido; drop: string }) {
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-[13px] font-semibold">{i.cantidad > 1 && `${i.cantidad}× `}{i.descripcion}</p>
                 <p className="text-xs text-ink-soft">{i.detalle}</p>
-                {dorsal ? (
+                {i.stockId ? (
+                  <p className="inline-flex items-center gap-1.5 bg-whatsapp/20 px-2 py-1 text-[10px] font-bold text-green-900">
+                    <Zap size={11} aria-hidden /> Entrega inmediata · sale de tu stock
+                  </p>
+                ) : dorsal ? (
                   <p className="inline-flex items-center gap-1.5 bg-navy-950 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-wider text-sky">
                     <Shirt size={11} aria-hidden /> {dorsal.replaceAll(' + ', ' · ').replaceAll('#', '')}
                   </p>
@@ -106,15 +110,17 @@ export default async function PedidosPage({ searchParams }: { searchParams: Para
   await requerirAdmin()
   const sp = await searchParams
   const drops = await listarDrops()
-  const drop = drops.find(d => d.id === sp.drop) ?? drops.find(d => d.estado === 'abierto') ?? drops[0]
-  const delDrop = drop ? await listarPedidos({ dropId: drop.id }) : []
+  const inmediata = sp.drop === 'inmediata'
+  const drop = inmediata ? undefined : drops.find(d => d.id === sp.drop) ?? drops.find(d => d.estado === 'abierto') ?? drops[0]
+  const delDrop = inmediata ? await listarPedidos({ sinDrop: true }) : drop ? await listarPedidos({ dropId: drop.id }) : []
+  const nombreGrupo = inmediata ? 'Entrega inmediata' : drop?.nombre
   const estado = ESTADOS_PEDIDO.find(e => e === sp.estado)
   const visibles = estado ? delDrop.filter(p => p.estado === estado) : delDrop
   const seleccionado = visibles.find(p => p.codigo === sp.codigo) ?? visibles[0]
 
   const url = (cambios: Record<string, string | undefined>) => {
     const p = new URLSearchParams()
-    const todo = { drop: drop?.id, estado, codigo: sp.codigo, ...cambios }
+    const todo = { drop: inmediata ? 'inmediata' : drop?.id, estado, codigo: sp.codigo, ...cambios }
     for (const [k, v] of Object.entries(todo)) if (v) p.set(k, v)
     return `/admin/pedidos?${p}`
   }
@@ -122,7 +128,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Para
   return (
     <>
       <PageHeader titulo="Pedidos" subtitulo="Cada «Enviar por WhatsApp» queda guardado aquí. Tú marcas la reserva y el pago.">
-        {drop && <SelectorDrop drops={drops.map(d => ({ id: d.id, nombre: d.nombre }))} actual={drop.id} />}
+        <SelectorDrop drops={drops.map(d => ({ id: d.id, nombre: d.nombre }))} actual={inmediata ? 'inmediata' : drop?.id ?? ''} conInmediata />
         {drop && (
           <Link href={`/admin/pedidos/export?drop=${drop.id}`} prefetch={false} className={boton.oscuro}>
             <FileSpreadsheet size={16} className="text-sky" aria-hidden /> Lista para el proveedor
@@ -189,7 +195,7 @@ export default async function PedidosPage({ searchParams }: { searchParams: Para
           </table>
         </Card>
 
-        {seleccionado && drop && <Detalle pedido={seleccionado} drop={drop.nombre} />}
+        {seleccionado && nombreGrupo && <Detalle pedido={seleccionado} drop={nombreGrupo} />}
       </div>
     </>
   )

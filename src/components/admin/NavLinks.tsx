@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, MessageCircle, Settings, Shirt, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, MessageCircle, Package, Settings, Shirt, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -17,6 +17,7 @@ const GRUPOS: { titulo: string; items: { href: string; label: string; icono: Luc
     titulo: 'Catálogo',
     items: [
       { href: '/admin/productos', label: 'Productos', icono: Shirt },
+      { href: '/admin/stock', label: 'Entrega inmediata', icono: Package },
       { href: '/admin/ligas', label: 'Ligas y equipos', icono: Trophy },
       { href: '/admin/precios', label: 'Precios y combos', icono: Tag },
     ],

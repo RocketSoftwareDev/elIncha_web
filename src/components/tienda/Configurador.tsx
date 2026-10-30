@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { Check, Lock, MapPin, Minus, Package, Plus, Shirt, ShoppingBag, Timer } from 'lucide-react'
+import { Check, Lock, MapPin, Minus, Package, Plus, Shirt, ShoppingBag, Timer, Zap } from 'lucide-react'
 import { MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { VistaPreviaCamiseta, VistaPreviaShort } from '@/components/dorsal/VistaPreviaDorsal'
@@ -25,11 +25,33 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
   const [numeroShort, setNumeroShort] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [avisoTalla, setAvisoTalla] = useState(false)
+  // Sobrantes listos para entregar: se venden sin drop, pero no se personalizan.
+  const hayStock = p.stock.length > 0
+  const [inmediata, setInmediata] = useState(!drop && hayStock)
+  const sobrante = inmediata ? p.stock.find(s => s.talla === talla) : undefined
+  const maxCantidad = inmediata ? (sobrante?.cantidad ?? 1) : 10
 
-  const errorNombre = validarNombre(nombre)
+  const errorNombre = inmediata ? null : validarNombre(nombre)
   const extraParches = parches.reduce((s, id) => s + (p.parches.find(x => x.id === id)?.precio ?? 0), 0)
-  const unitario = (conCombo && combo ? combo.precio : p.precio) + extraParches
+  const precioStock = sobrante?.precio ?? Math.min(...p.stock.map(s => s.precio))
+  const unitario = inmediata ? precioStock : (conCombo && combo ? combo.precio : p.precio) + extraParches
   const titulo = `${p.equipo.nombre} ${p.nombre}`
+  const puedeAgregar = inmediata || !!drop
+
+  function cambiarModo(v: boolean) {
+    setInmediata(v)
+    setTalla(null)
+    setCantidad(1)
+    setParches([])
+    setConCombo(false)
+    setPersonalizar(!v && p.tipo.aceptaPersonalizacion)
+  }
+
+  function elegirTalla(t: string) {
+    setTalla(t)
+    setAvisoTalla(false)
+    if (inmediata) setCantidad(c => Math.min(c, p.stock.find(s => s.talla === t)?.cantidad ?? 1))
+  }
 
   function alternarParche(id: string) {
     setParches(ps => (ps.includes(id) ? ps.filter(x => x !== id) : [...ps, id]))
@@ -37,6 +59,24 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
 
   function agregarAlCarrito() {
     if (!talla) return setAvisoTalla(true)
+    if (inmediata) {
+      if (!sobrante) return setAvisoTalla(true)
+      registrar({ tipo: 'agregar_carrito', ruta: `/producto/${p.slug}`, productoId: p.id })
+      return agregar({
+        productoId: p.id,
+        comboId: null,
+        stockId: sobrante.id,
+        talla,
+        cantidad: Math.min(cantidad, sobrante.cantidad),
+        max: sobrante.cantidad,
+        personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [] },
+        titulo,
+        detalle: `${p.tipo.nombre} · Talla ${talla} · Entrega inmediata`,
+        foto: p.fotos[0],
+        unitario: sobrante.precio,
+        dorsal: null,
+      })
+    }
     if (errorNombre) return
     const n = personalizar ? nombre.trim() : ''
     const num = personalizar ? numero : ''
@@ -52,6 +92,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
     agregar({
       productoId: p.id,
       comboId: conCombo && combo ? combo.id : null,
+      stockId: null,
       talla,
       cantidad,
       personalizacion: { nombre: n, numero: num, numeroShort: nShort, parches },
@@ -68,11 +109,42 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       <p className="kicker w-fit bg-sky px-2.5 py-1.5 text-[11px] font-bold text-navy-950">{p.liga.nombre} · {p.tipo.nombre}</p>
       <h1 className="display text-[clamp(48px,6vw,72px)] leading-[0.95]">{p.equipo.nombre}<br />{p.nombre}</h1>
       <div className="flex items-end gap-3.5">
-        <p className="display text-5xl text-sky">{formatoPrecio(p.precio)}</p>
-        {p.tipo.aceptaPersonalizacion && <p className="pb-1 text-[15px] text-muted">Nombre y número GRATIS</p>}
+        <p className="display text-5xl text-sky">{formatoPrecio(inmediata ? precioStock : p.precio)}</p>
+        {inmediata
+          ? precioStock < p.precio && <p className="pb-1 text-[15px] text-muted line-through">{formatoPrecio(p.precio)}</p>
+          : p.tipo.aceptaPersonalizacion && <p className="pb-1 text-[15px] text-muted">Nombre y número GRATIS</p>}
       </div>
 
-      {drop ? (
+      {hayStock && (
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cómo la quieres">
+          {[
+            { v: false, titulo: 'Bajo pedido', sub: 'Con tu nombre y número' },
+            { v: true, titulo: 'Entrega inmediata', sub: 'Lista ya · sin personalizar' },
+          ].map(o => (
+            <button
+              key={o.titulo}
+              type="button"
+              role="radio"
+              aria-checked={inmediata === o.v}
+              onClick={() => cambiarModo(o.v)}
+              className={`px-4 py-3 text-left transition ${inmediata === o.v ? 'bg-white text-navy-950' : 'border border-line hover:border-white'}`}
+            >
+              <span className="block text-[15px] font-bold">{o.titulo}</span>
+              <span className={`block text-[12px] ${inmediata === o.v ? 'text-navy-700' : 'text-muted'}`}>{o.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {inmediata ? (
+        <div className="flex items-center gap-3 border-l-[3px] border-whatsapp bg-whatsapp/10 px-4 py-3.5">
+          <Zap size={20} className="shrink-0 text-whatsapp" aria-hidden />
+          <div>
+            <p className="text-sm font-bold">Entrega inmediata</p>
+            <p className="text-[13px] text-muted">Ya la tenemos en Machala. Va tal cual, sin nombre, número ni parches.</p>
+          </div>
+        </div>
+      ) : drop ? (
         <div className="flex items-center gap-3 border-l-[3px] border-sky bg-sky/10 px-4 py-3.5">
           <Timer size={20} className="shrink-0 text-sky" aria-hidden />
           <div className="flex-1">
@@ -86,7 +158,9 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
           <Lock size={20} className="shrink-0 text-red-400" aria-hidden />
           <div>
             <p className="text-sm font-bold">No hay drop abierto</p>
-            <p className="text-[13px] text-muted">Pronto realizaremos otro drop. Puedes ver la camiseta, pero aún no pedirla.</p>
+            <p className="text-[13px] text-muted">
+              {hayStock ? 'Personalizada se pide en el próximo drop. Ahora mismo puedes llevarla en entrega inmediata.' : 'Pronto realizaremos otro drop. Puedes ver la camiseta, pero aún no pedirla.'}
+            </p>
           </div>
         </div>
       )}
@@ -94,25 +168,38 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       <fieldset className="space-y-3">
         <div className="flex justify-between">
           <legend className="kicker">Talla</legend>
-          <span className="text-[13px] text-muted">Tallas de Ecuador</span>
+          <span className="text-[13px] text-muted">{inmediata ? 'Solo las tallas que tenemos' : 'Tallas de Ecuador'}</span>
         </div>
         <div className="grid grid-cols-6 gap-2">
-          {p.tipo.tallas.map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setTalla(t); setAvisoTalla(false) }}
-              aria-pressed={talla === t}
-              className={`h-[52px] text-[15px] font-bold transition ${talla === t ? 'bg-white text-navy-950' : 'border border-line hover:border-white'}`}
-            >
-              {t}
-            </button>
-          ))}
+          {inmediata
+            ? p.stock.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => elegirTalla(s.talla)}
+                  aria-pressed={talla === s.talla}
+                  className={`flex h-[52px] flex-col items-center justify-center font-bold transition ${talla === s.talla ? 'bg-white text-navy-950' : 'border border-line hover:border-white'}`}
+                >
+                  <span className="text-[15px]">{s.talla}</span>
+                  <span className="text-[10px] font-semibold opacity-70">{s.cantidad === 1 ? 'última' : `quedan ${s.cantidad}`}</span>
+                </button>
+              ))
+            : p.tipo.tallas.map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => elegirTalla(t)}
+                  aria-pressed={talla === t}
+                  className={`h-[52px] text-[15px] font-bold transition ${talla === t ? 'bg-white text-navy-950' : 'border border-line hover:border-white'}`}
+                >
+                  {t}
+                </button>
+              ))}
         </div>
         {avisoTalla && <p role="alert" className="text-sm text-red-300">Elige una talla para continuar.</p>}
       </fieldset>
 
-      {p.tipo.aceptaPersonalizacion && (
+      {!inmediata && p.tipo.aceptaPersonalizacion && (
         <div className="space-y-4 border border-sky bg-navy-900 p-5 md:p-6">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-2.5 text-[17px] font-bold"><Shirt size={20} className="text-sky" aria-hidden /> {p.tipo.esShort ? 'Número · gratis' : 'Nombre y número · gratis'}</p>
@@ -188,7 +275,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
         </div>
       )}
 
-      {combo && (
+      {!inmediata && combo && (
         <div className={`space-y-4 border p-3.5 transition ${conCombo ? 'border-sky bg-navy-800' : 'border-line bg-navy-900'}`}>
           <div className="flex items-center gap-3.5">
             <Image src={combo.fotoShort} alt="" width={56} height={56} className="size-14 object-cover" />
@@ -220,9 +307,9 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
         <div className="flex h-[60px] items-center gap-5 border border-line px-[18px]">
           <button type="button" onClick={() => setCantidad(c => Math.max(1, c - 1))} aria-label="Quitar uno"><Minus size={16} /></button>
           <span className="w-4 text-center font-bold" aria-live="polite">{cantidad}</span>
-          <button type="button" onClick={() => setCantidad(c => Math.min(10, c + 1))} aria-label="Agregar uno"><Plus size={16} /></button>
+          <button type="button" onClick={() => setCantidad(c => Math.min(maxCantidad, c + 1))} aria-label="Agregar uno"><Plus size={16} /></button>
         </div>
-        {drop ? (
+        {puedeAgregar ? (
           <button type="button" onClick={agregarAlCarrito} disabled={!!errorNombre} className="kicker flex h-[60px] flex-1 items-center justify-center gap-2.5 bg-sky text-sm font-bold text-navy-950 transition hover:brightness-105 disabled:opacity-50">
             <ShoppingBag size={18} aria-hidden /> Agregar al carrito · {formatoPrecio(unitario * cantidad)}
           </button>
@@ -234,7 +321,10 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       </div>
 
       <ul className="space-y-3 border-t border-line pt-5 text-sm text-[#d6def0]">
-        <li className="flex items-center gap-3"><Package size={18} className="text-sky" aria-hidden /> Bajo pedido: llega 20–30 días después del cierre del drop</li>
+        <li className="flex items-center gap-3">
+          <Package size={18} className="text-sky" aria-hidden />
+          {inmediata ? 'Entrega inmediata: la coordinamos apenas confirmes' : 'Bajo pedido: llega 20–30 días después del cierre del drop'}
+        </li>
         <li className="flex items-center gap-3"><MessageCircle size={18} className="text-sky" aria-hidden /> Reservas con $5 por WhatsApp, el resto lo coordinamos contigo</li>
         <li className="flex items-center gap-3"><MapPin size={18} className="text-sky" aria-hidden /> Entrega en Machala y envíos a todo El Oro</li>
       </ul>

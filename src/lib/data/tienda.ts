@@ -10,7 +10,7 @@ import { normalizarNombre, normalizarNumero, validarNombre, validarNumero } from
 import { calcularLinea, type Catalogo } from '@/lib/domain/pricing'
 import type { Drop, PedidoItem, ProductoVista } from '@/lib/domain/types'
 import { armarMensaje, enlaceWhatsapp } from '@/lib/domain/whatsapp'
-import { catalogo, repo, type DatosCatalogo } from './repo'
+import { catalogo, ErrorNegocio, repo, type DatosCatalogo } from './repo'
 
 export async function dropActual(): Promise<Drop | null> {
   return (await catalogo()).drops.find(d => d.estado === 'abierto') ?? null
@@ -40,7 +40,12 @@ function vista(c: DatosCatalogo, id: string): ProductoVista | null {
   const tipo = c.tipos.find(t => t.id === p.tipoId)
   if (!equipo || !liga || !tipo) return null
   const parches = c.parches.filter(x => x.activo && p.parchesPermitidos.includes(x.id))
-  return { ...p, equipo, liga, tipo, parches, precio: p.precioEspecial ?? tipo.precio }
+  const precio = p.precioEspecial ?? tipo.precio
+  const stock = c.stock
+    .filter(s => s.productoId === p.id && s.cantidad > 0)
+    .sort((a, b) => tipo.tallas.indexOf(a.talla) - tipo.tallas.indexOf(b.talla))
+    .map(s => ({ id: s.id, talla: s.talla, cantidad: s.cantidad, precio: s.precio ?? precio }))
+  return { ...p, equipo, liga, tipo, parches, precio, stock }
 }
 
 /** Todo el catálogo visible; /vitrina filtra con `buscar` (lib/domain/vitrina). */
@@ -75,6 +80,7 @@ function catalogoPrecios(c: DatosCatalogo): Catalogo {
     tipos: new Map(c.tipos.map(t => [t.id, t])),
     parches: new Map(c.parches.map(p => [p.id, p])),
     combos: new Map(c.combos.map(x => [x.id, x])),
+    stock: new Map(c.stock.map(s => [s.id, s])),
   }
 }
 
@@ -84,6 +90,7 @@ const lineaSchema = z.object({
   key: z.string().max(64),
   productoId: z.string().max(64),
   comboId: z.string().max(64).nullable(),
+  stockId: z.string().max(64).nullable().default(null),
   talla: z.string().max(4),
   cantidad: z.number().int().min(1).max(10),
   personalizacion: z.object({
@@ -123,7 +130,12 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
 
   const c = await catalogo()
   const drop = c.drops.find(d => d.estado === 'abierto') ?? null
-  if (!aceptaPedidos(drop, Date.now())) return { ok: false, error: 'No hay un drop abierto. Pronto realizaremos otro drop.' }
+  const dropAbierto = aceptaPedidos(drop, Date.now())
+  // Entrega inmediata (stock) se vende siempre; lo personalizado solo con un drop abierto.
+  const soloStock = lineas.every(l => l.stockId)
+  if (!dropAbierto && !soloStock) {
+    return { ok: false, error: 'No hay un drop abierto: por ahora solo puedes pedir camisetas de entrega inmediata. Quita las demás del carrito.' }
+  }
 
   const cat = catalogoPrecios(c)
   const items: PedidoItem[] = []
@@ -132,6 +144,36 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
     const tipo = producto && cat.tipos.get(producto.tipoId)
     if (!producto || !producto.visible || !tipo) return { ok: false, error: 'Una de las prendas ya no está disponible.' }
     if (!tipo.tallas.includes(l.talla)) return { ok: false, error: `Talla no disponible: ${l.talla}` }
+    const v = vista(c, producto.id)
+    if (!v) return { ok: false, error: 'Una de las prendas ya no está disponible.' }
+
+    if (l.stockId) {
+      const s = cat.stock.get(l.stockId)
+      if (!s || s.cantidad < l.cantidad) return { ok: false, error: `Ya no quedan suficientes ${v.equipo.nombre} ${producto.nombre} talla ${l.talla} de entrega inmediata.` }
+      let calc
+      try {
+        calc = calcularLinea(l, cat) // rechaza nombre, número, parches o combo en una prenda de stock
+      } catch {
+        return { ok: false, error: 'Las camisetas de entrega inmediata no se personalizan.' }
+      }
+      items.push({
+        id: crypto.randomUUID(),
+        descripcion: `${v.equipo.nombre} ${producto.nombre}`,
+        detalle: `${tipo.nombre} · Talla ${l.talla} · Entrega inmediata, sin personalizar`,
+        talla: l.talla,
+        cantidad: l.cantidad,
+        dorsalNombre: null,
+        dorsalNumero: null,
+        shortNumero: null,
+        parches: [],
+        precioUnitario: calc.unitario,
+        subtotal: calc.subtotal,
+        comboId: null,
+        productoId: producto.id,
+        stockId: s.id,
+      })
+      continue
+    }
 
     const nombre = normalizarNombre(l.personalizacion.nombre).trim()
     const numero = normalizarNumero(l.personalizacion.numero)
@@ -147,8 +189,6 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
     } catch {
       return { ok: false, error: 'Una de las opciones ya no está disponible.' }
     }
-    const v = vista(c, producto.id)
-    if (!v) return { ok: false, error: 'Una de las prendas ya no está disponible.' }
     const combo = l.comboId ? cat.combos.get(l.comboId) : undefined
     items.push({
       id: crypto.randomUUID(),
@@ -164,19 +204,26 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
       subtotal: calc.subtotal,
       comboId: combo?.id ?? null,
       productoId: producto.id,
+      stockId: null,
     })
   }
 
   const total = items.reduce((s, i) => s + i.subtotal, 0)
   const reserva = Math.min(c.ajustes.montoReserva, total)
   await repo.registrarIntento(clave)
-  const { codigo } = await repo.crearPedido({
-    dropId: drop!.id, clienteNombre: cliente, clienteWhatsapp: whatsapp, sector, total, reserva, estado: 'por_confirmar', items,
-  })
+  let codigo: string
+  try {
+    // Un pedido solo de entrega inmediata no pertenece a ningún drop.
+    ;({ codigo } = await repo.crearPedido({
+      dropId: soloStock ? null : drop!.id, clienteNombre: cliente, clienteWhatsapp: whatsapp, sector, total, reserva, estado: 'por_confirmar', items,
+    }))
+  } catch (e) {
+    if (e instanceof ErrorNegocio) return { ok: false, error: e.message }
+    throw e
+  }
 
   const mensaje = armarMensaje({
-    saludo: c.ajustes.saludo,
-    drop: drop!.nombre,
+    saludo: c.ajustes.saludo,    drop: soloStock ? 'Entrega inmediata' : drop!.nombre,
     lineas: items.map(i => ({
       cantidad: i.cantidad,
       titulo: i.descripcion,

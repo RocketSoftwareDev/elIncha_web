@@ -27,6 +27,9 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
   const abiertoDrop = dropNombre !== null
   const total = totalCarrito(lineas)
   const n = articulosCarrito(lineas)
+  // Lo de entrega inmediata se pide siempre; lo bajo pedido espera a que haya drop.
+  const bajoPedido = lineas.filter(l => !l.stockId)
+  const bloqueado = !abiertoDrop && bajoPedido.length > 0
 
   useEffect(() => {
     if (!abierto) return
@@ -46,7 +49,7 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
     iniciar(async () => {
       const r = await enviarPedido({
         ...datos,
-        lineas: lineas.map(({ key, productoId, comboId, talla, cantidad, personalizacion }) => ({ key, productoId, comboId, talla, cantidad, personalizacion })),
+        lineas: lineas.map(({ key, productoId, comboId, stockId, talla, cantidad, personalizacion }) => ({ key, productoId, comboId, stockId: stockId ?? null, talla, cantidad, personalizacion })),
       })
       if (!r.ok) return setError(r.error)
       setEnviado({ codigo: r.codigo, url: r.whatsappUrl })
@@ -64,14 +67,14 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
         <div className="flex items-center justify-between border-b border-line-dark px-6 py-6 md:px-8">
           <div className="flex items-end gap-3">
             <h2 id="titulo-carrito" className="display text-4xl">Tu carrito</h2>
-            {abiertoDrop && n > 0 && <span className="kicker mb-1 text-[11px] text-navy-700">{n} {n === 1 ? 'artículo' : 'artículos'} · {dropNombre}</span>}
+            {n > 0 && <span className="kicker mb-1 text-[11px] text-navy-700">{n} {n === 1 ? 'artículo' : 'artículos'} · {bajoPedido.length > 0 && dropNombre ? dropNombre : 'Entrega inmediata'}</span>}
           </div>
           <button type="button" onClick={cerrar} aria-label="Cerrar"><X size={24} /></button>
         </div>
 
         {enviado ? (
           <Enviado codigo={enviado.codigo} url={enviado.url} onCerrar={() => { setEnviado(null); cerrar() }} />
-        ) : !abiertoDrop ? (
+        ) : !abiertoDrop && lineas.length === 0 ? (
           <EnPausa instagram={instagram} onCerrar={cerrar} />
         ) : lineas.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
@@ -91,6 +94,9 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
                       <p className="display text-2xl">{formatoPrecio(l.unitario * l.cantidad)}</p>
                     </div>
                     <p className="text-[13px] text-ink-soft">{l.detalle}</p>
+                    {!abiertoDrop && !l.stockId && (
+                      <p className="w-fit bg-red-100 px-2 py-1 text-[11px] font-bold text-red-800">Bajo pedido · espera el próximo drop</p>
+                    )}
                     {l.dorsal && (
                       <p className="flex w-fit items-center gap-1.5 bg-navy-950 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-sky">
                         <Shirt size={12} aria-hidden /> {l.dorsal}
@@ -126,13 +132,22 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
                 <span className="display text-5xl">{formatoPrecio(total)}</span>
               </div>
               {error && <p role="alert" className="bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
-              <button type="submit" disabled={pendiente} className="kicker flex h-16 w-full items-center justify-center gap-3 bg-whatsapp font-bold text-navy-950 transition hover:brightness-95 disabled:opacity-60">
+              {bloqueado && (
+                <div role="alert" className="space-y-2 bg-red-100 px-3 py-2.5 text-sm text-red-800">
+                  <p>No hay drop abierto: ahora solo se piden las camisetas de entrega inmediata.</p>
+                  <button type="button" onClick={() => bajoPedido.forEach(l => quitar(l.key))} className="font-bold underline">
+                    Quitar {bajoPedido.length === 1 ? 'la de bajo pedido' : `las ${bajoPedido.length} de bajo pedido`}
+                  </button>
+                </div>
+              )}
+              <button type="submit" disabled={pendiente || bloqueado}className="kicker flex h-16 w-full items-center justify-center gap-3 bg-whatsapp font-bold text-navy-950 transition hover:brightness-95 disabled:opacity-60">
                 <WhatsappLogo size={24} weight="fill" aria-hidden />
                 {pendiente ? 'Preparando tu pedido…' : 'Enviar pedido por WhatsApp'}
               </button>
               <p className="text-center text-xs leading-relaxed text-ink-soft">
                 No pagas aquí. Por WhatsApp te pasamos los datos para la reserva de {formatoPrecio(montoReserva)}.
-                {llegaEntre && ` Llega entre el ${llegaEntre}.`}
+                {llegaEntre && bajoPedido.length > 0 && ` Lo bajo pedido llega entre el ${llegaEntre}.`}
+                {bajoPedido.length < lineas.length && ' Lo de entrega inmediata lo coordinamos apenas confirmes.'}
               </p>
             </form>
           </>
@@ -167,7 +182,8 @@ function EnPausa({ instagram, onCerrar }: { instagram: string; onCerrar: () => v
       <div className="grid size-[72px] place-items-center rounded-full bg-sky-soft text-navy-800"><TimerOff size={32} aria-hidden /></div>
       <p className="display text-4xl">Carrito en pausa</p>
       <p className="text-[15px] leading-relaxed text-ink-soft">Ningún drop disponible por ahora. Pronto realizaremos otro drop y podrás armar tu pedido.</p>
-      <Link href="/vitrina" onClick={onCerrar} className="kicker flex h-14 w-full items-center justify-center bg-navy-950 font-bold text-white">Seguir viendo la vitrina</Link>
+      <Link href="/vitrina?inmediata=1" onClick={onCerrar} className="kicker flex h-14 w-full items-center justify-center bg-navy-950 font-bold text-white">Ver entrega inmediata</Link>
+      <Link href="/vitrina" onClick={onCerrar} className="text-sm underline">Seguir viendo la vitrina</Link>
       <a href={`https://instagram.com/${instagram.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="kicker flex h-14 w-full items-center justify-center gap-2 border border-navy-950/20 font-bold">
         <InstagramLogo size={18} aria-hidden /> Síguenos para enterarte
       </a>

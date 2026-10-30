@@ -37,7 +37,7 @@ function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 export function Filtros({ filtros: f, ligas, tipos, equipos, porLiga, porTipo, porEquipo }: Props) {
-  const hayFiltros = f.ligas.length + f.tipos.length + f.equipos.length > 0 || f.parches
+  const hayFiltros = f.ligas.length + f.tipos.length + f.equipos.length > 0 || f.parches || f.inmediata
   // Equipos que tienen algo con los filtros actuales; si hay ligas elegidas, solo de esas ligas.
   const equiposVisibles = equipos
     .filter(e => (porEquipo.get(idCorto(e.id)) ?? 0) > 0 || f.equipos.includes(idCorto(e.id)))
@@ -50,7 +50,7 @@ export function Filtros({ filtros: f, ligas, tipos, equipos, porLiga, porTipo, p
     <div className="space-y-7">
       <div className="flex items-center justify-between">
         <p className="kicker font-bold text-sky">Filtrar</p>
-        {hayFiltros && <Link href={urlVitrina(f, { ligas: [], tipos: [], equipos: [], parches: false })} scroll={false} className="text-[13px] text-muted underline hover:text-white">Limpiar</Link>}
+        {hayFiltros && <Link href={urlVitrina(f, { ligas: [], tipos: [], equipos: [], parches: false, inmediata: false })} scroll={false} className="text-[13px] text-muted underline hover:text-white">Limpiar</Link>}
       </div>
 
       <Grupo titulo="Liga">
@@ -90,12 +90,19 @@ export function Filtros({ filtros: f, ligas, tipos, equipos, porLiga, porTipo, p
         <FiltroEquipos equipos={equiposVisibles} />
       </Grupo>
 
-      <Link href={urlVitrina(f, { parches: !f.parches })} scroll={false} role="switch" aria-checked={f.parches} className="flex items-center justify-between">
-        <span className="text-sm font-semibold">Solo con parches</span>
-        <span className={`flex h-[22px] w-10 items-center rounded-full p-[3px] transition ${f.parches ? 'justify-end bg-sky' : 'justify-start bg-white/15'}`}>
-          <span className={`size-4 rounded-full ${f.parches ? 'bg-navy-950' : 'bg-white'}`} />
-        </span>
-      </Link>
+      <Interruptor etiqueta="Entrega inmediata" on={f.inmediata} href={urlVitrina(f, { inmediata: !f.inmediata })} />
+      <Interruptor etiqueta="Solo con parches" on={f.parches} href={urlVitrina(f, { parches: !f.parches })} />
     </div>
+  )
+}
+
+function Interruptor({ etiqueta, on, href }: { etiqueta: string; on: boolean; href: string }) {
+  return (
+    <Link href={href} scroll={false} role="switch" aria-checked={on} className="flex items-center justify-between">
+      <span className="text-sm font-semibold">{etiqueta}</span>
+      <span className={`flex h-[22px] w-10 items-center rounded-full p-[3px] transition ${on ? 'justify-end bg-sky' : 'justify-start bg-white/15'}`}>
+        <span className={`size-4 rounded-full ${on ? 'bg-navy-950' : 'bg-white'}`} />
+      </span>
+    </Link>
   )
 }

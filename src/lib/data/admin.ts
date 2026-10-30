@@ -49,7 +49,7 @@ export async function cambiarEstadoDrop(id: string, estado: EstadoDrop) {
 
 // ---------- Pedidos ----------
 
-export async function listarPedidos(filtro: { dropId?: string; estado?: EstadoPedido } = {}): Promise<Pedido[]> {
+export async function listarPedidos(filtro: { dropId?: string; sinDrop?: boolean; estado?: EstadoPedido } = {}): Promise<Pedido[]> {
   return repo.pedidos(filtro)
 }
 
@@ -61,11 +61,11 @@ export async function cambiarEstadoPedido(codigo: string, estado: EstadoPedido) 
   await repo.cambiarEstadoPedido(codigo, estado)
 }
 
-/** Una fila por prenda: lo que necesita el proveedor para fabricar. */
+/** Una fila por prenda: lo que necesita el proveedor para fabricar. Lo de stock ya está aquí: no va. */
 export async function listaProveedorCsv(dropId: string): Promise<string> {
   const filas = [['pedido', 'prenda', 'detalle', 'talla', 'nombre', 'numero', 'numero_short', 'parches']]
   for (const p of (await repo.pedidos({ dropId })).filter(x => x.estado !== 'cancelado')) {
-    for (const i of p.items) {
+    for (const i of p.items.filter(x => !x.stockId)) {
       for (let n = 0; n < i.cantidad; n++) {
         filas.push([p.codigo, i.descripcion, i.detalle, i.talla, i.dorsalNombre ?? '', i.dorsalNumero ?? '', i.shortNumero ?? '', i.parches.map(x => x.nombre).join(' | ')])
       }
@@ -185,6 +185,49 @@ export async function guardarProducto(datos: Omit<Producto, 'id' | 'slug'> & { i
 export async function alternarVisible(id: string) {
   const p = (await catalogo()).productos.find(x => x.id === id)
   if (p) await repo.guardarProducto({ ...p, visible: !p.visible })
+}
+
+// ---------- Stock de entrega inmediata ----------
+
+/** Sobrantes con su camiseta y el precio que verá el cliente. Primero lo que queda. */
+export async function listarStock() {
+  const [c, productos] = await Promise.all([catalogo(), listarProductos()])
+  return c.stock
+    .flatMap(s => {
+      const p = productos.find(x => x.id === s.productoId)
+      return p ? [{ ...s, producto: p, precioNormal: p.precioEspecial ?? p.tipo.precio }] : []
+    })
+    .sort((a, b) => Number(b.cantidad > 0) - Number(a.cantidad > 0) ||
+      `${a.producto.equipo.nombre} ${a.producto.nombre}`.localeCompare(`${b.producto.equipo.nombre} ${b.producto.nombre}`, 'es') ||
+      a.producto.tipo.tallas.indexOf(a.talla) - a.producto.tipo.tallas.indexOf(b.talla))
+}
+
+/** Si esa camiseta ya tiene stock en esa talla, suma las unidades (y cambia el precio si se indicó). */
+export async function agregarStock(datos: { productoId: string; talla: string; cantidad: number; precio: number | null }) {
+  const c = await catalogo()
+  const p = c.productos.find(x => x.id === datos.productoId)
+  const tipo = p && c.tipos.find(t => t.id === p.tipoId)
+  if (!p || !tipo) throw new ErrorNegocio('Camiseta no encontrada')
+  if (!tipo.tallas.includes(datos.talla)) throw new ErrorNegocio(`${tipo.nombre} no viene en talla ${datos.talla}`)
+  const existe = c.stock.find(s => s.productoId === p.id && s.talla === datos.talla)
+  if (!existe) return repo.crearStock({ id: crypto.randomUUID(), ...datos })
+  await repo.sumarStock(existe.id, datos.cantidad)
+  if (datos.precio !== null) await repo.precioStock(existe.id, datos.precio)
+}
+
+export async function sumarStock(id: string, delta: number) {
+  if (!(await catalogo()).stock.some(s => s.id === id)) throw new ErrorNegocio('Stock no encontrado')
+  await repo.sumarStock(id, delta)
+}
+
+export async function precioStock(id: string, precio: number | null) {
+  if (!(await catalogo()).stock.some(s => s.id === id)) throw new ErrorNegocio('Stock no encontrado')
+  await repo.precioStock(id, precio)
+}
+
+/** Los pedidos que ya la apartaron no cambian; si se cancelan, esas unidades ya no vuelven. */
+export async function eliminarStock(id: string) {
+  await repo.eliminarStock(id)
 }
 
 /** Guarda una foto ya convertida a WebP en el navegador y la agrega al producto. */

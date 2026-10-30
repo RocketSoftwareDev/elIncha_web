@@ -6,7 +6,7 @@ import 'server-only'
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
-  Ajustes, Combo, Drop, Equipo, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, PedidoItem, Producto, TipoPrenda,
+  Ajustes, Combo, Drop, Equipo, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, PedidoItem, Producto, Stock, TipoPrenda,
 } from '@/lib/domain/types'
 import { ErrorNegocio, type EventoGuardado, type Repo } from './tipos'
 
@@ -27,6 +27,8 @@ type Respuesta<T> = { data: T | null; error: { message: string; code?: string } 
 function ok<T>(r: Respuesta<T>, contexto: string): T | null {
   if (r.error) {
     if (r.error.code === '23505' && contexto === 'drop') throw new ErrorNegocio('Ya hay un drop abierto. Ciérralo antes de abrir otro.')
+    if (r.error.code === '23505' && contexto === 'stock') throw new ErrorNegocio('Esa camiseta ya tiene stock en esa talla: ajusta la cantidad en la lista.')
+    if (r.error.message?.includes('SIN_STOCK')) throw new ErrorNegocio('Una de las camisetas de entrega inmediata ya se vendió. Revisa tu carrito.')
     console.error(`[supabase] ${contexto}:`, r.error.code, r.error.message)
     throw new Error(`Error de base de datos (${contexto})`)
   }
@@ -56,13 +58,14 @@ const aProducto = (f: Fila): Producto => ({
   precioEspecial: f.precio_especial === null ? null : num(f.precio_especial), visible: f.visible as boolean, destacado: f.destacado as boolean,
   fotos: f.fotos as string[], parchesPermitidos: f.parches_permitidos as string[],
 })
+const aStock = (f: Fila): Stock => ({ id: f.id as string, productoId: f.producto_id as string, talla: f.talla as string, cantidad: f.cantidad as number, precio: f.precio === null ? null : num(f.precio) })
 const aDrop = (f: Fila): Drop => ({
   id: f.id as string, nombre: f.nombre as string, abreEn: new Date(f.abre_en as string).toISOString(), cierraEn: new Date(f.cierra_en as string).toISOString(),
   envioEn: new Date(f.envio_en as string).toISOString(), llegadaMinDias: f.llegada_min_dias as number, llegadaMaxDias: f.llegada_max_dias as number,
   estado: f.estado as EstadoDrop, mostrarCuentaRegresiva: f.mostrar_cuenta_regresiva as boolean,
 })
 const aPedido = (f: Fila): Pedido => ({
-  id: f.id as string, codigo: f.codigo as string, dropId: f.drop_id as string, clienteNombre: f.cliente_nombre as string,
+  id: f.id as string, codigo: f.codigo as string, dropId: (f.drop_id as string | null) ?? null, clienteNombre: f.cliente_nombre as string,
   clienteWhatsapp: f.cliente_whatsapp as string, sector: f.sector as string, total: num(f.total), reserva: num(f.reserva),
   estado: f.estado as EstadoPedido, creadoEn: new Date(f.creado_en as string).toISOString(), items: f.items as PedidoItem[],
 })
@@ -81,7 +84,7 @@ export const repoSupabase: Repo = {
 
   async catalogo() {
     const c = sb()
-    const [drops, ligas, equipos, tipos, parches, productos, combos, ajustes] = await Promise.all([
+    const [drops, ligas, equipos, tipos, parches, productos, combos, stock, ajustes] = await Promise.all([
       c.from('drops').select('*').order('abre_en', { ascending: false }),
       c.from('ligas').select('*').order('orden'),
       c.from('equipos').select('*').order('orden'),
@@ -89,6 +92,7 @@ export const repoSupabase: Repo = {
       c.from('parches').select('*').order('nombre'),
       c.from('productos').select('*'),
       c.from('combos').select('*'),
+      c.from('stock').select('*'),
       c.from('ajustes').select('datos').eq('id', 1).single(),
     ])
     return {
@@ -99,6 +103,7 @@ export const repoSupabase: Repo = {
       parches: datos(parches, 'parches').map(aParche),
       productos: datos(productos, 'productos').map(aProducto),
       combos: datos(combos, 'combos').map(aCombo),
+      stock: datos(stock, 'stock').map(aStock),
       ajustes: datos(ajustes, 'ajustes').datos as Ajustes,
     }
   },
@@ -106,6 +111,7 @@ export const repoSupabase: Repo = {
   async pedidos(f = {}) {
     let q = sb().from('pedidos').select('*').order('creado_en', { ascending: false }).limit(1000)
     if (f.dropId) q = q.eq('drop_id', f.dropId)
+    if (f.sinDrop) q = q.is('drop_id', null)
     if (f.estado) q = q.eq('estado', f.estado)
     if (f.desde !== undefined) q = q.gte('creado_en', new Date(f.desde).toISOString())
     if (f.hasta !== undefined) q = q.lte('creado_en', new Date(f.hasta).toISOString())
@@ -116,14 +122,18 @@ export const repoSupabase: Repo = {
     return f ? aPedido(f) : null
   },
   async crearPedido(p) {
-    const r = await sb().from('pedidos').insert({
-      drop_id: p.dropId, cliente_nombre: p.clienteNombre, cliente_whatsapp: p.clienteWhatsapp, sector: p.sector,
-      total: p.total, reserva: p.reserva, estado: p.estado, items: p.items,
-    }).select('codigo').single<{ codigo: string }>()
-    return { codigo: datos(r, 'crear pedido').codigo }
+    // crear_pedido() (migración 0006) aparta el stock y crea el pedido en una sola transacción.
+    const r = await sb().rpc('crear_pedido', {
+      p: {
+        dropId: p.dropId, clienteNombre: p.clienteNombre, clienteWhatsapp: p.clienteWhatsapp, sector: p.sector,
+        total: p.total, reserva: p.reserva, items: p.items,
+      },
+    })
+    return { codigo: datos(r as Respuesta<string>, 'crear pedido') }
   },
   async cambiarEstadoPedido(codigo, estado) {
-    ok(await sb().from('pedidos').update({ estado }).eq('codigo', codigo), 'estado pedido')
+    // Cancelar devuelve el stock; reactivar un cancelado lo vuelve a apartar.
+    ok(await sb().rpc('cambiar_estado_pedido', { p_codigo: codigo, p_estado: estado }), 'estado pedido')
   },
 
   async guardarDrop(d) { ok(await sb().from('drops').upsert(deDrop(d)), 'drop') },
@@ -136,6 +146,13 @@ export const repoSupabase: Repo = {
   async guardarCombo(c) { ok(await sb().from('combos').upsert({ id: c.id, nombre: c.nombre, precio: c.precio, activo: c.activo, tipos: c.tipos }), 'combo') },
   async guardarParche(p) { ok(await sb().from('parches').upsert({ id: p.id, nombre: p.nombre, precio: p.precio, activo: p.activo }), 'parche') },
   async guardarAjustes(a) { ok(await sb().from('ajustes').upsert({ id: 1, datos: a }), 'ajustes') },
+  async crearStock(s) {
+    ok(await sb().from('stock').insert({ id: s.id, producto_id: s.productoId, talla: s.talla, cantidad: s.cantidad, precio: s.precio }), 'stock')
+  },
+  // sumar_stock() (migración 0006) suma en la base: un pedido que entra al mismo tiempo no se pierde.
+  async sumarStock(id, delta) { ok(await sb().rpc('sumar_stock', { p_id: id, p_delta: delta }), 'sumar stock') },
+  async precioStock(id, precio) { ok(await sb().from('stock').update({ precio }).eq('id', id), 'precio stock') },
+  async eliminarStock(id) { ok(await sb().from('stock').delete().eq('id', id), 'eliminar stock') },
 
   async registrarEvento(e: EventoGuardado) {
     ok(await sb().from('eventos').insert({

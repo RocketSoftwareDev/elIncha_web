@@ -13,6 +13,8 @@ export interface LineaVista extends LineaCarrito {
   foto: string
   unitario: number
   dorsal: string | null
+  /** Tope de unidades: lo que queda en stock para entrega inmediata. */
+  max?: number
 }
 
 interface EstadoCarrito {
@@ -29,7 +31,7 @@ interface EstadoCarrito {
 /** Misma prenda con la misma talla y personalización suma cantidad en vez de duplicarse. */
 function clave(l: Omit<LineaVista, 'key'>) {
   const p = l.personalizacion
-  return [l.productoId, l.comboId ?? '-', l.talla, p.nombre, p.numero, p.numeroShort, [...p.parches].sort().join('+')].join('|')
+  return [l.productoId, l.comboId ?? '-', l.stockId ?? '-', l.talla, p.nombre, p.numero, p.numeroShort, [...p.parches].sort().join('+')].join('|')
 }
 
 export const useCarrito = create<EstadoCarrito>()(
@@ -42,13 +44,13 @@ export const useCarrito = create<EstadoCarrito>()(
           const key = clave(l)
           const existe = s.lineas.find(x => x.key === key)
           const lineas = existe
-            ? s.lineas.map(x => (x.key === key ? { ...x, cantidad: Math.min(10, x.cantidad + l.cantidad) } : x))
+            ? s.lineas.map(x => (x.key === key ? { ...x, max: l.max, cantidad: Math.min(l.max ?? 10, x.cantidad + l.cantidad) } : x))
             : [...s.lineas, { ...l, key }]
           return { lineas, abierto: true }
         }),
       cambiarCantidad: (key, delta) =>
         set(s => ({
-          lineas: s.lineas.map(x => (x.key === key ? { ...x, cantidad: Math.max(1, Math.min(10, x.cantidad + delta)) } : x)),
+          lineas: s.lineas.map(x => (x.key === key ? { ...x, cantidad: Math.max(1, Math.min(x.max ?? 10, x.cantidad + delta)) } : x)),
         })),
       quitar: key => set(s => ({ lineas: s.lineas.filter(x => x.key !== key) })),
       vaciar: () => set({ lineas: [] }),

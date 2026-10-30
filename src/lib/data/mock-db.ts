@@ -4,7 +4,7 @@ import 'server-only'
 // con él: sirve para ver y probar la tienda y el admin sin back ni Docker.
 
 import type {
-  Ajustes, Combo, Drop, Equipo, Liga, Parche, Pedido, Producto, TipoPrenda,
+  Ajustes, Combo, Drop, Equipo, Liga, Parche, Pedido, Producto, Stock, TipoPrenda,
 } from '@/lib/domain/types'
 
 export interface MockDb {
@@ -15,6 +15,7 @@ export interface MockDb {
   parches: Parche[]
   productos: Producto[]
   combos: Combo[]
+  stock: Stock[]
   ajustes: Ajustes
   pedidos: Pedido[]
   secuenciaPedido: number
@@ -128,7 +129,14 @@ function semilla(): MockDb {
     pedido(136, 'Bryan C.', 'El Guabo', 27, 'cancelado', 52),
   ]
 
-  return { drops, ligas, equipos, tipos, parches, productos, combos, ajustes, pedidos, secuenciaPedido: 142 }
+  // Sobrantes de un drop anterior: se venden ya, sin personalizar.
+  const stock: Stock[] = [
+    { id: 's-bayern-m', productoId: 'pr-bayern-local-25-26', talla: 'M', cantidad: 3, precio: null },
+    { id: 's-emelec-l', productoId: 'pr-emelec-local-2025', talla: 'L', cantidad: 2, precio: 32 },
+    { id: 's-barca-s', productoId: 'pr-barcelona-local-25-26', talla: 'S', cantidad: 1, precio: null },
+  ]
+
+  return { drops, ligas, equipos, tipos, parches, productos, combos, stock, ajustes, pedidos, secuenciaPedido: 142 }
 }
 
 // Sobrevive a la recarga en caliente de `next dev`.
