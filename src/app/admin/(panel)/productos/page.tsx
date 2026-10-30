@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { ExternalLink, Pencil, Plus, Search } from 'lucide-react'
 import Image from 'next/image'
@@ -14,6 +15,8 @@ type Params = Promise<{ q?: string; liga?: string }>
 const sinTildes = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 export default async function ProductosPage({ searchParams }: { searchParams: Params }) {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const { q = '', liga } = await searchParams
   const [productos, ligas, drops] = await Promise.all([listarProductos(), listarLigas(), listarDrops()])
   const abierto = drops.find(d => d.estado === 'abierto') ?? drops[0]

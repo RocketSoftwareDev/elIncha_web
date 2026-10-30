@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { WhatsappLogo } from '@phosphor-icons/react/dist/ssr'
 import { CircleCheck, FileSpreadsheet, Package, Shirt } from 'lucide-react'
@@ -101,6 +102,8 @@ function Detalle({ pedido, drop }: { pedido: Pedido; drop: string }) {
 }
 
 export default async function PedidosPage({ searchParams }: { searchParams: Params }) {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const sp = await searchParams
   const drops = await listarDrops()
   const drop = drops.find(d => d.id === sp.drop) ?? drops.find(d => d.estado === 'abierto') ?? drops[0]

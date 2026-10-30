@@ -1,12 +1,12 @@
 'use client'
 
-import { ArrowLeft, Check, ImagePlus, Lock, Plus, Send } from 'lucide-react'
-import Image from 'next/image'
+import { ArrowLeft, Check, Lock, Plus, Send } from 'lucide-react'
 import Link from 'next/link'
 import { useActionState, useState } from 'react'
 import { guardarProductoAccion } from '@/app/admin/acciones'
 import { formatoPrecio } from '@/lib/domain/pricing'
 import type { Equipo, Liga, Parche, Producto, TipoPrenda } from '@/lib/domain/types'
+import { SubidaFotos } from './SubidaFotos'
 import { Aviso, Campo, Interruptor, input } from './ui'
 
 interface Props {
@@ -15,11 +15,13 @@ interface Props {
   tipos: TipoPrenda[]
   parches: Parche[]
   producto: Producto | null
+  /** Con Supabase configurado se pueden subir fotos. */
+  subirFotos: boolean
 }
 
 const tarjeta = 'space-y-4 rounded-2xl border border-line-dark bg-white p-5'
 
-export function FormProducto({ ligas, equipos, tipos, parches, producto }: Props) {
+export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFotos }: Props) {
   const [estado, enviar, pendiente] = useActionState(guardarProductoAccion, null)
 
   const equipoInicial = equipos.find(e => e.id === producto?.equipoId)
@@ -150,18 +152,7 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto }: Props
               <h2 className="text-base font-bold">4. Fotos</h2>
               <span className="kicker text-[10px] text-ink-soft">{producto?.fotos.length ?? 0} / 6</span>
             </div>
-            <div className="grid grid-cols-4 gap-2.5">
-              {producto?.fotos.map((f, i) => (
-                <div key={f + i} className={`relative h-[110px] overflow-hidden rounded-lg bg-[#e3ecf8] ${i === 0 ? 'ring-2 ring-navy-950' : ''}`}>
-                  <Image src={f} alt={`Foto ${i + 1}`} fill sizes="90px" className="object-cover" />
-                </div>
-              ))}
-              <div className="flex h-[110px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/20 text-ink-soft opacity-60">
-                <ImagePlus size={20} aria-hidden />
-                <span className="text-xs">Subir</span>
-              </div>
-            </div>
-            <p className="text-xs text-ink-soft">La primera es la portada. La subida de fotos se habilita con el back.</p>
+            <SubidaFotos productoId={producto?.id ?? null} fotos={producto?.fotos ?? []} habilitada={subirFotos} />
           </section>
 
           <section className={tarjeta}>

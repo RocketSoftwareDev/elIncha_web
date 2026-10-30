@@ -29,8 +29,13 @@ describe('armarMensaje', () => {
 describe('enlaceWhatsapp', () => {
   it('deja solo dígitos en el número y codifica el texto', () => {
     const url = enlaceWhatsapp('+593 99 999-9999', mensaje)
-    expect(url.startsWith('https://wa.me/593999999999?text=')).toBe(true)
+    expect(url.startsWith('https://api.whatsapp.com/send?phone=593999999999&text=')).toBe(true)
     expect(url).not.toContain(' ')
     expect(decodeURIComponent(url.split('text=')[1])).toBe(mensaje)
+  })
+
+  it('conserva emojis, Ñ y tildes (wa.me dañaba el ⚽)', () => {
+    const url = enlaceWhatsapp('0999', '⚽ MUÑOZ · Múnich')
+    expect(decodeURIComponent(url.split('text=')[1])).toBe('⚽ MUÑOZ · Múnich')
   })
 })

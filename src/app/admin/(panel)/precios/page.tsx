@@ -1,3 +1,4 @@
+import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
 import { Plus, Shield } from 'lucide-react'
 import { crearComboAccion, crearParcheAccion, guardarPreciosAccion } from '@/app/admin/acciones'
@@ -62,6 +63,8 @@ function TarjetaCombo({ combo, tipos }: { combo: Combo; tipos: TipoPrenda[] }) {
 }
 
 export default async function PreciosPage() {
+  // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
+  await requerirAdmin()
   const [tipos, combos, parches] = await Promise.all([listarTipos(), listarCombos(), listarParches()])
 
   return (
