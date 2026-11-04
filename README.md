@@ -29,6 +29,7 @@ Para ver el estado «sin drop», cierra el drop desde `/admin/drops`.
    - `supabase/migraciones/0004_escudos.sql` (escudos de equipos)
    - `supabase/migraciones/0005_eliminar_en_cascada.sql` (eliminar una liga borra sus equipos y camisetas de una vez)
    - `supabase/migraciones/0006_stock.sql` (stock de entrega inmediata; **obligatoria**: los pedidos pasan por sus funciones)
+   - `supabase/migraciones/0007_pantalonetas_y_sponsors.sql` (pantalonetas del combo y versión sin sponsors; **obligatoria**: sin ella la tienda no lee el catálogo)
 
    Imágenes en el bucket `fotos` (las carpetas se crean solas al subir desde el admin):
    `productos/{id}/` fotos de camisetas · `ligas/{id}/` círculo de la liga · `equipos/{id}/` escudo.
@@ -149,6 +150,14 @@ public/mock/           fotos de muestra
   el pedido. No van en la lista para el proveedor. Un pedido solo de stock no pertenece a
   ningún drop: en *Pedidos* se ve con el filtro «Entrega inmediata (sin drop)».
 - **Precios** por tipo de prenda; combos que el cliente elige; parches $1; **reserva fija** $5.
+- **Precios** en dólares siempre con 2 decimales ($54.00, $43.99); el admin acepta «43.99» o «43,99».
+- **Combo:** el cliente elige la pantaloneta (Admin → Precios y combos) y su talla, que puede ser distinta
+  a la de la camiseta. El extra de la pantaloneta se suma al combo. La lista del proveedor lleva short y talla.
+- **Sponsors:** si la camiseta tiene versión sin patrocinadores, el cliente elige con o sin (gratis).
+- **Soporte (/soporte):** lo escribe el admin (Admin → Soporte). No existe en la tienda hasta que haya
+  una sección visible con texto. Texto plano: línea en blanco = párrafo, «- » = viñeta, «|» = tabla.
+- **Logos** de ligas y escudos: al subirlos se quita el fondo liso y el espacio vacío y se centran
+  con el mismo margen, para que todos se vean del mismo tamaño.
 - **WhatsApp:** el enlace va a `api.whatsapp.com/send` (la redirección de `wa.me` daña el ⚽).
 
 ## Docker (etapa VPS)

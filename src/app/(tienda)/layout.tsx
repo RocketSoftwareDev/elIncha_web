@@ -2,7 +2,7 @@ import { CarritoPanel } from '@/components/tienda/CarritoPanel'
 import { Footer } from '@/components/tienda/Footer'
 import { Header } from '@/components/tienda/Header'
 import { aceptaPedidos, resumenDrop } from '@/lib/domain/drop'
-import { ajustesPublicos, dropActual } from '@/lib/data/tienda'
+import { ajustesPublicos, catalogoVisible, dropActual } from '@/lib/data/tienda'
 import { RegistroVistas } from '@/lib/analitica/Registro'
 import { ahora } from '@/lib/reloj'
 
@@ -10,13 +10,15 @@ import { ahora } from '@/lib/reloj'
 export const dynamic = 'force-dynamic'
 
 export default async function TiendaLayout({ children }: { children: React.ReactNode }) {
-  const [drop, ajustes] = await Promise.all([dropActual(), ajustesPublicos()])
+  const [drop, ajustes, catalogo] = await Promise.all([dropActual(), ajustesPublicos(), catalogoVisible()])
+  // El apartado «Entrega inmediata» solo se muestra si hay alguna camiseta en stock.
+  const inmediatas = catalogo.filter(p => p.stock.length > 0).length
   const abierto = aceptaPedidos(drop, ahora())
 
   return (
     <>
       <RegistroVistas />
-      <Header whatsapp={ajustes.whatsapp} />
+      <Header whatsapp={ajustes.whatsapp} inmediatas={inmediatas} />
       <main>{children}</main>
       <Footer ajustes={ajustes} />
       <CarritoPanel

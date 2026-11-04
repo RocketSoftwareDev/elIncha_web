@@ -45,8 +45,8 @@ export default async function LigasPage({ searchParams }: { searchParams: Params
                   <Link href={`/admin/ligas?liga=${l.id}`} aria-current={activa ? 'page' : undefined}
                     className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 ${activa ? 'bg-navy-950 text-white' : 'hover:bg-admin-bg'} ${l.visible ? '' : 'opacity-60'}`}>
                     <GripVertical size={14} className={activa ? 'text-[#5b6b95]' : 'text-[#b6c0d6]'} aria-hidden />
-                    <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[#e3ecf8] ${activa ? 'ring-2 ring-sky' : ''}`}>
-                      {l.foto ? <Image src={l.foto} alt="" fill sizes="36px" className="object-cover" /> : <Shield size={16} className="text-navy-800" aria-hidden />}
+                    <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full ${l.foto ? 'bg-white' : 'bg-[#e3ecf8]'} ${activa ? 'ring-2 ring-sky' : ''}`}>
+                      {l.foto ? <Image src={l.foto} alt="" fill sizes="36px" className="object-contain p-1" /> : <Shield size={16} className="text-navy-800" aria-hidden />}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5 text-sm font-semibold">

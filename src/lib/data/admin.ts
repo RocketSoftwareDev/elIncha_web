@@ -5,8 +5,9 @@ import 'server-only'
 // Quien llama (acciones y páginas del admin) ya verificó la sesión.
 
 import type {
-  Ajustes, Combo, Drop, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, Producto, TipoPrenda,
+  Ajustes, Combo, Drop, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, Producto, SeccionSoporte, ShortCombo, TipoPrenda,
 } from '@/lib/domain/types'
+import { idSeccion, MAX_SECCIONES, SECCIONES_SUGERIDAS } from '@/lib/domain/soporte'
 import { catalogo, ErrorNegocio, repo } from './repo'
 
 // ---------- Resumen del drop ----------
@@ -63,11 +64,15 @@ export async function cambiarEstadoPedido(codigo: string, estado: EstadoPedido) 
 
 /** Una fila por prenda: lo que necesita el proveedor para fabricar. Lo de stock ya está aquí: no va. */
 export async function listaProveedorCsv(dropId: string): Promise<string> {
-  const filas = [['pedido', 'prenda', 'detalle', 'talla', 'nombre', 'numero', 'numero_short', 'parches']]
+  const filas = [['pedido', 'prenda', 'detalle', 'talla', 'sponsors', 'nombre', 'numero', 'short', 'talla_short', 'numero_short', 'parches']]
   for (const p of (await repo.pedidos({ dropId })).filter(x => x.estado !== 'cancelado')) {
     for (const i of p.items.filter(x => !x.stockId)) {
       for (let n = 0; n < i.cantidad; n++) {
-        filas.push([p.codigo, i.descripcion, i.detalle, i.talla, i.dorsalNombre ?? '', i.dorsalNumero ?? '', i.shortNumero ?? '', i.parches.map(x => x.nombre).join(' | ')])
+        filas.push([
+          p.codigo, i.descripcion, i.detalle, i.talla, i.sinSponsors ? 'SIN sponsors' : 'con sponsors',
+          i.dorsalNombre ?? '', i.dorsalNumero ?? '', i.shortNombre ?? '', i.tallaShort ?? '', i.shortNumero ?? '',
+          i.parches.map(x => x.nombre).join(' | '),
+        ])
       }
     }
   }
@@ -239,6 +244,17 @@ export async function agregarFoto(productoId: string, datos: Uint8Array) {
   await repo.guardarProducto({ ...p, fotos: [...p.fotos, url] })
 }
 
+/** Cambia el orden de las fotos: la primera es la portada de la tarjeta. */
+export async function moverFoto(productoId: string, url: string, destino: number) {
+  const p = (await catalogo()).productos.find(x => x.id === productoId)
+  if (!p) throw new ErrorNegocio('Producto no encontrado')
+  const desde = p.fotos.indexOf(url)
+  if (desde < 0) throw new ErrorNegocio('Foto no encontrada')
+  const fotos = p.fotos.filter(f => f !== url)
+  fotos.splice(Math.max(0, Math.min(destino, fotos.length)), 0, url)
+  await repo.guardarProducto({ ...p, fotos })
+}
+
 export async function quitarFoto(productoId: string, url: string) {
   const p = (await catalogo()).productos.find(x => x.id === productoId)
   if (!p) throw new ErrorNegocio('Producto no encontrado')
@@ -282,6 +298,77 @@ export async function guardarTipo(id: string, cambios: Partial<Omit<TipoPrenda, 
   await repo.guardarTipo({ ...t, ...cambios })
 }
 
+const TALLAS_VALIDAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Niño']
+
+function revisarTallas(tallas: string[]) {
+  if (tallas.length === 0) throw new ErrorNegocio('Elige al menos una talla')
+  if (tallas.some(t => !TALLAS_VALIDAS.includes(t))) throw new ErrorNegocio('Talla no válida')
+  return TALLAS_VALIDAS.filter(t => tallas.includes(t)) // siempre en el mismo orden
+}
+
+export async function crearTipo(datos: Omit<TipoPrenda, 'id' | 'orden'>) {
+  const c = await catalogo()
+  const nombre = datos.nombre.trim()
+  if (c.tipos.some(t => t.nombre.toLowerCase() === nombre.toLowerCase())) throw new ErrorNegocio('Ya existe un tipo con ese nombre')
+  if (!(datos.precio > 0)) throw new ErrorNegocio('El precio debe ser mayor a 0')
+  await repo.guardarTipo({
+    ...datos, nombre, tallas: revisarTallas(datos.tallas),
+    id: `t-${aSlug(nombre) || crypto.randomUUID().slice(0, 8)}-${crypto.randomUUID().slice(0, 4)}`,
+    orden: c.tipos.length,
+  })
+}
+
+export async function editarTipo(id: string, datos: Pick<TipoPrenda, 'nombre' | 'precio' | 'tallas' | 'aceptaPersonalizacion' | 'esShort'>) {
+  const c = await catalogo()
+  if (c.tipos.some(t => t.id !== id && t.nombre.toLowerCase() === datos.nombre.trim().toLowerCase())) throw new ErrorNegocio('Ya existe un tipo con ese nombre')
+  await guardarTipo(id, { ...datos, nombre: datos.nombre.trim(), tallas: revisarTallas(datos.tallas) })
+}
+
+/** Solo se quita si ninguna camiseta ni combo lo usa: así no queda nada roto en la tienda. */
+export async function eliminarTipo(id: string) {
+  const c = await catalogo()
+  const t = c.tipos.find(x => x.id === id)
+  if (!t) throw new ErrorNegocio('Tipo no encontrado')
+  const usos = c.productos.filter(p => p.tipoId === id).length
+  if (usos) throw new ErrorNegocio(`«${t.nombre}» lo usan ${usos} ${usos === 1 ? 'camiseta' : 'camisetas'}. Cámbialas de tipo u ocúltalas primero.`)
+  if (c.combos.some(x => x.tipos.includes(id))) throw new ErrorNegocio(`«${t.nombre}» es parte de un combo. Quítalo del combo primero.`)
+  await repo.eliminarTipo(id)
+}
+
+// ---------- Pantalonetas del combo ----------
+
+export async function listarShorts() {
+  return [...(await catalogo()).shorts].sort((a, b) => a.orden - b.orden)
+}
+
+export async function crearShort(datos: { nombre: string; extra: number; tallas: string[] }) {
+  const c = await catalogo()
+  const id = `sh-${crypto.randomUUID().slice(0, 8)}`
+  await repo.guardarShort({ id, nombre: datos.nombre.trim(), extra: datos.extra, tallas: revisarTallas(datos.tallas), foto: '', activo: true, orden: c.shorts.length })
+  return id
+}
+
+export async function guardarShort(id: string, cambios: Partial<Omit<ShortCombo, 'id'>>) {
+  const s = (await catalogo()).shorts.find(x => x.id === id)
+  if (!s) throw new ErrorNegocio('Pantaloneta no encontrada')
+  if (cambios.tallas) cambios.tallas = revisarTallas(cambios.tallas)
+  if (cambios.extra !== undefined && !(cambios.extra >= 0)) throw new ErrorNegocio('El extra no puede ser negativo')
+  await repo.guardarShort({ ...s, ...cambios })
+}
+
+/** Los pedidos ya hechos guardan el nombre de la pantaloneta: no se pierden. */
+export async function eliminarShort(id: string) {
+  await repo.eliminarShort(id)
+  await repo.borrarCarpetas([`shorts/${id}`])
+}
+
+export async function cambiarFotoShort(id: string, datos: Uint8Array) {
+  const s = (await catalogo()).shorts.find(x => x.id === id)
+  if (!s) throw new ErrorNegocio('Pantaloneta no encontrada')
+  const url = await repo.subirFoto(`shorts/${s.id}/${crypto.randomUUID()}.webp`, datos)
+  await repo.guardarShort({ ...s, foto: url })
+}
+
 export async function listarCombos(): Promise<Combo[]> {
   return (await catalogo()).combos
 }
@@ -309,6 +396,43 @@ export async function leerAjustes(): Promise<Ajustes> {
 export async function guardarAjustes(cambios: Partial<Ajustes>) {
   if (cambios.montoReserva !== undefined && !(cambios.montoReserva >= 0)) throw new ErrorNegocio('Monto de reserva inválido')
   await repo.guardarAjustes({ ...(await catalogo()).ajustes, ...cambios })
+}
+
+// ---------- Soporte (/soporte) ----------
+// Se guarda dentro de Ajustes (jsonb): no necesita tabla nueva.
+
+export async function listarSoporte(): Promise<SeccionSoporte[]> {
+  return (await catalogo()).ajustes.soporte ?? SECCIONES_SUGERIDAS
+}
+
+async function guardarSoporte(secciones: SeccionSoporte[]) {
+  await guardarAjustes({ soporte: secciones })
+}
+
+export async function guardarSeccion(id: string | null, datos: Omit<SeccionSoporte, 'id'>) {
+  const lista = await listarSoporte()
+  const titulo = datos.titulo.trim()
+  if (lista.some(s => s.id !== id && s.titulo.toLowerCase() === titulo.toLowerCase())) throw new ErrorNegocio('Ya hay una sección con ese título')
+  if (datos.visible && !datos.contenido.trim()) throw new ErrorNegocio('Escribe el texto antes de mostrarla en la tienda')
+  if (id) {
+    if (!lista.some(s => s.id === id)) throw new ErrorNegocio('Sección no encontrada')
+    return guardarSoporte(lista.map(s => (s.id === id ? { ...s, ...datos, titulo } : s)))
+  }
+  if (lista.length >= MAX_SECCIONES) throw new ErrorNegocio(`Máximo ${MAX_SECCIONES} secciones`)
+  await guardarSoporte([...lista, { ...datos, titulo, id: idSeccion(titulo, lista.map(s => s.id)) }])
+}
+
+export async function moverSeccion(id: string, delta: -1 | 1) {
+  const lista = [...(await listarSoporte())]
+  const i = lista.findIndex(s => s.id === id)
+  const j = i + delta
+  if (i < 0 || j < 0 || j >= lista.length) return
+  ;[lista[i], lista[j]] = [lista[j], lista[i]]
+  await guardarSoporte(lista)
+}
+
+export async function eliminarSeccion(id: string) {
+  await guardarSoporte((await listarSoporte()).filter(s => s.id !== id))
 }
 
 export const modoPrueba = () => repo.modo === 'prueba'

@@ -5,7 +5,7 @@
 
 import type { Dispositivo, Fuente, TipoEvento } from '@/lib/domain/analitica'
 import type {
-  Ajustes, Combo, Drop, Equipo, EstadoPedido, Liga, Parche, Pedido, Producto, Stock, TipoPrenda,
+  Ajustes, Combo, Drop, Equipo, EstadoPedido, Liga, Parche, Pedido, Producto, ShortCombo, Stock, TipoPrenda,
 } from '@/lib/domain/types'
 
 export interface DatosCatalogo {
@@ -17,6 +17,7 @@ export interface DatosCatalogo {
   productos: Producto[]
   combos: Combo[]
   stock: Stock[]
+  shorts: ShortCombo[]
   ajustes: Ajustes
 }
 
@@ -62,6 +63,10 @@ export interface Repo {
   guardarEquipo(e: Equipo): Promise<void>
   guardarProducto(p: Producto): Promise<void>
   guardarTipo(t: TipoPrenda): Promise<void>
+  /** Solo si ninguna camiseta lo usa (lo revisa admin.ts; la base también lo impide). */
+  eliminarTipo(id: string): Promise<void>
+  guardarShort(s: ShortCombo): Promise<void>
+  eliminarShort(id: string): Promise<void>
   guardarCombo(c: Combo): Promise<void>
   guardarParche(p: Parche): Promise<void>
   guardarAjustes(a: Ajustes): Promise<void>

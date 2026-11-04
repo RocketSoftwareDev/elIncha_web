@@ -1,22 +1,27 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { Check, Lock, MapPin, Minus, Package, Plus, Shirt, ShoppingBag, Timer, Zap } from 'lucide-react'
 import { MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { VistaPreviaCamiseta, VistaPreviaShort } from '@/components/dorsal/VistaPreviaDorsal'
 import { useCarrito } from '@/lib/cart/store'
 import { MAX_NOMBRE, MENSAJE_ERROR, largo, normalizarNombre, normalizarNumero, validarNombre } from '@/lib/domain/dorsal'
+import { Precio } from '@/components/Precio'
 import { formatoPrecio } from '@/lib/domain/pricing'
 import type { ProductoVista } from '@/lib/domain/types'
 import { CuentaRegresivaCorta } from './CuentaRegresivaCorta'
 import { useDorsal } from './producto/DorsalContexto'
 import { registrar } from '@/lib/analitica/registrar'
 
-interface ComboOferta { id: string; nombre: string; precio: number; precioSuelto: number; fotoShort: string }
+interface ShortOferta { id: string; nombre: string; foto: string; extra: number; tallas: string[] }
+interface ComboOferta { id: string; nombre: string; precio: number; precioSuelto: number; shorts: ShortOferta[] }
 interface DropInfo { nombre: string; pideHasta: string; llegaEntre: string; cierraEn: string }
 
-export function Configurador({ producto: p, combo, drop }: { producto: ProductoVista; combo: ComboOferta | null; drop: DropInfo | null }) {
+export function Configurador({ producto: p, combo, drop, inicioInmediata, guiaTallas = null }: {
+  producto: ProductoVista; combo: ComboOferta | null; drop: DropInfo | null; inicioInmediata: boolean; guiaTallas?: string | null
+}) {
   const agregar = useCarrito(s => s.agregar)
   const { nombre, numero, personalizar, setNombre, setNumero, setPersonalizar } = useDorsal()
   const [talla, setTalla] = useState<string | null>(null)
@@ -25,16 +30,23 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
   const [numeroShort, setNumeroShort] = useState('')
   const [cantidad, setCantidad] = useState(1)
   const [avisoTalla, setAvisoTalla] = useState(false)
+  const [sinSponsors, setSinSponsors] = useState(false)
+  // Combo: pantaloneta y su talla (puede ser distinta a la de la camiseta).
+  const [shortId, setShortId] = useState<string | null>(combo?.shorts[0]?.id ?? null)
+  const [tallaShort, setTallaShort] = useState<string | null>(null)
+  const [avisoShort, setAvisoShort] = useState(false)
+  const short = combo?.shorts.find(s => s.id === shortId)
   // Sobrantes listos para entregar: se venden sin drop, pero no se personalizan.
   const hayStock = p.stock.length > 0
-  const [inmediata, setInmediata] = useState(!drop && hayStock)
+  const [inmediata, setInmediata] = useState(inicioInmediata)
   const sobrante = inmediata ? p.stock.find(s => s.talla === talla) : undefined
   const maxCantidad = inmediata ? (sobrante?.cantidad ?? 1) : 10
 
   const errorNombre = inmediata ? null : validarNombre(nombre)
   const extraParches = parches.reduce((s, id) => s + (p.parches.find(x => x.id === id)?.precio ?? 0), 0)
   const precioStock = sobrante?.precio ?? Math.min(...p.stock.map(s => s.precio))
-  const unitario = inmediata ? precioStock : (conCombo && combo ? combo.precio : p.precio) + extraParches
+  const enCombo = !inmediata && conCombo && !!combo
+  const unitario = inmediata ? precioStock : (enCombo ? combo!.precio + (short?.extra ?? 0) : p.precio) + extraParches
   const titulo = `${p.equipo.nombre} ${p.nombre}`
   const puedeAgregar = inmediata || !!drop
 
@@ -44,7 +56,15 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
     setCantidad(1)
     setParches([])
     setConCombo(false)
+    setSinSponsors(false)
     setPersonalizar(!v && p.tipo.aceptaPersonalizacion)
+  }
+
+  function elegirShort(id: string) {
+    setShortId(id)
+    setAvisoShort(false)
+    // Si la talla elegida no existe en esta pantaloneta, se vuelve a pedir.
+    if (tallaShort && !combo?.shorts.find(s => s.id === id)?.tallas.includes(tallaShort)) setTallaShort(null)
   }
 
   function elegirTalla(t: string) {
@@ -66,10 +86,12 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
         productoId: p.id,
         comboId: null,
         stockId: sobrante.id,
+        shortId: null,
+        tallaShort: '',
         talla,
         cantidad: Math.min(cantidad, sobrante.cantidad),
         max: sobrante.cantidad,
-        personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [] },
+        personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [], sinSponsors: false },
         titulo,
         detalle: `${p.tipo.nombre} · Talla ${talla} · Entrega inmediata`,
         foto: p.fotos[0],
@@ -78,9 +100,10 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       })
     }
     if (errorNombre) return
+    if (enCombo && (!short || !tallaShort)) return setAvisoShort(true)
     const n = personalizar ? nombre.trim() : ''
     const num = personalizar ? numero : ''
-    const nShort = conCombo ? numeroShort : ''
+    const nShort = enCombo ? numeroShort : ''
     const nombresParches = parches.map(id => p.parches.find(x => x.id === id)?.nombre).filter(Boolean)
     const dorsal = [
       [n, num && `#${num}`].filter(Boolean).join(' '),
@@ -91,13 +114,20 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
     registrar({ tipo: 'agregar_carrito', ruta: `/producto/${p.slug}`, productoId: p.id })
     agregar({
       productoId: p.id,
-      comboId: conCombo && combo ? combo.id : null,
+      comboId: enCombo ? combo!.id : null,
       stockId: null,
+      shortId: enCombo ? short!.id : null,
+      tallaShort: enCombo ? tallaShort! : '',
       talla,
       cantidad,
-      personalizacion: { nombre: n, numero: num, numeroShort: nShort, parches },
-      titulo: conCombo && combo ? `Combo ${combo.nombre}` : titulo,
-      detalle: conCombo && combo ? `${titulo} + Short · Talla ${talla}` : `${p.tipo.nombre} · Talla ${talla}`,
+      personalizacion: { nombre: n, numero: num, numeroShort: nShort, parches, sinSponsors },
+      titulo: enCombo ? `Combo ${combo!.nombre}` : titulo,
+      detalle: [
+        enCombo ? `${titulo} + ${short!.nombre}` : p.tipo.nombre,
+        `Talla ${talla}`,
+        enCombo && `Short ${tallaShort}`,
+        sinSponsors && 'Sin sponsors',
+      ].filter(Boolean).join(' · '),
       foto: p.fotos[0],
       unitario,
       dorsal: dorsal || null,
@@ -109,9 +139,9 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       <p className="kicker w-fit bg-sky px-2.5 py-1.5 text-[11px] font-bold text-navy-950">{p.liga.nombre} · {p.tipo.nombre}</p>
       <h1 className="display text-[clamp(48px,6vw,72px)] leading-[0.95]">{p.equipo.nombre}<br />{p.nombre}</h1>
       <div className="flex items-end gap-3.5">
-        <p className="display text-5xl text-sky">{formatoPrecio(inmediata ? precioStock : p.precio)}</p>
+        <Precio valor={inmediata ? precioStock : p.precio} className="display text-5xl text-sky" />
         {inmediata
-          ? precioStock < p.precio && <p className="pb-1 text-[15px] text-muted line-through">{formatoPrecio(p.precio)}</p>
+          ? precioStock < p.precio && <Precio valor={p.precio} tachado className="pb-1 text-[15px] text-muted" />
           : p.tipo.aceptaPersonalizacion && <p className="pb-1 text-[15px] text-muted">Nombre y número GRATIS</p>}
       </div>
 
@@ -168,7 +198,10 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
       <fieldset className="space-y-3">
         <div className="flex justify-between">
           <legend className="kicker">Talla</legend>
-          <span className="text-[13px] text-muted">{inmediata ? 'Solo las tallas que tenemos' : 'Tallas de Ecuador'}</span>
+          <span className="flex items-center gap-3 text-[13px] text-muted">
+            {inmediata ? 'Solo las tallas que tenemos' : 'Tallas de Ecuador'}
+            {guiaTallas && <Link href={guiaTallas} className="text-sky underline underline-offset-2">Guía de tallas</Link>}
+          </span>
         </div>
         <div className="grid grid-cols-6 gap-2">
           {inmediata
@@ -198,6 +231,35 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
         </div>
         {avisoTalla && <p role="alert" className="text-sm text-red-300">Elige una talla para continuar.</p>}
       </fieldset>
+
+      {!inmediata && p.versionSinSponsors && (
+        <fieldset className="space-y-2.5">
+          <div className="flex justify-between">
+            <legend className="text-[15px] font-bold">Patrocinadores (sponsors)</legend>
+            <span className="kicker text-[11px] text-sky">Sin costo</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Patrocinadores">
+            {[
+              { v: false, titulo: 'Con sponsors', sub: 'Como la usa el equipo' },
+              { v: true, titulo: 'Sin sponsors', sub: 'Pecho limpio' },
+            ].map(o => {
+              const on = sinSponsors === o.v
+              return (
+                <button key={o.titulo} type="button" role="radio" aria-checked={on} onClick={() => setSinSponsors(o.v)}
+                  className={`flex items-center gap-3 border px-3.5 py-3 text-left transition ${on ? 'border-sky bg-sky/10' : 'border-line hover:border-white'}`}>
+                  <span className={`grid size-5 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-sky' : 'border-muted'}`}>
+                    {on && <span className="size-2.5 rounded-full bg-sky" />}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold">{o.titulo}</span>
+                    <span className="block text-xs text-muted">{o.sub}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+      )}
 
       {!inmediata && p.tipo.aceptaPersonalizacion && (
         <div className="space-y-4 border border-sky bg-navy-900 p-5 md:p-6">
@@ -258,7 +320,7 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
             <div className="space-y-2.5 border-t border-line pt-3.5">
               <div className="flex justify-between">
                 <p className="text-[15px] font-bold">Parches</p>
-                <p className="kicker text-[11px] text-sky">+$1 c/u</p>
+                <p className="kicker text-[11px] text-sky">Uno o varios · +{formatoPrecio(p.parches[0].precio)} c/u</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {p.parches.map(x => {
@@ -270,20 +332,24 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
                   )
                 })}
               </div>
+              {parches.length > 0 && (
+                <p className="text-xs text-muted">
+                  {parches.length} {parches.length === 1 ? 'elegido' : 'elegidos'} · {parches.map(id => p.parches.find(x => x.id === id)?.nombre).join(' + ')}
+                </p>
+              )}
             </div>
           )}
         </div>
       )}
 
       {!inmediata && combo && (
-        <div className={`space-y-4 border p-3.5 transition ${conCombo ? 'border-sky bg-navy-800' : 'border-line bg-navy-900'}`}>
+        <div className={`space-y-4 border p-4 transition ${conCombo ? 'border-sky bg-navy-800' : 'border-line bg-navy-900'}`}>
           <div className="flex items-center gap-3.5">
-            <Image src={combo.fotoShort} alt="" width={56} height={56} className="size-14 object-cover" />
             <div className="flex-1">
-              <p className="text-sm font-bold">Llévala en combo {combo.nombre} (+ Short Player)</p>
+              <p className="text-sm font-bold">{conCombo ? `Combo ${combo.nombre} · camiseta + short` : `Llévala en combo ${combo.nombre} (+ short)`}</p>
               <p className="flex items-center gap-2">
-                <span className="display text-[22px] text-sky">{formatoPrecio(combo.precio)}</span>
-                <span className="text-[13px] text-muted line-through">{formatoPrecio(combo.precioSuelto)}</span>
+                <Precio valor={combo.precio} className="display text-[22px] text-sky" />
+                {combo.precioSuelto > combo.precio && <Precio valor={combo.precioSuelto} tachado className="text-[13px] text-muted" />}
                 <span className="kicker text-[10px] text-sky">Combo</span>
               </p>
             </div>
@@ -291,13 +357,57 @@ export function Configurador({ producto: p, combo, drop }: { producto: ProductoV
               {conCombo ? 'Elegido ✓' : 'Elegir combo'}
             </button>
           </div>
+
           {conCombo && (
-            <div className="flex items-center gap-4 border-t border-line pt-3.5">
-              <VistaPreviaShort numero={numeroShort} className="w-28 shrink-0" />
-              <label className="flex-1 space-y-2">
-                <span className="kicker text-[11px] text-muted">Número del short (opcional)</span>
-                <input value={numeroShort} onChange={e => setNumeroShort(normalizarNumero(e.target.value))} inputMode="numeric" placeholder="10" className="display w-24 border border-line bg-navy-950 px-4 py-3 text-2xl outline-none focus:border-sky" />
-              </label>
+            <div className="space-y-4 border-t border-line pt-4">
+              <fieldset className="space-y-2.5">
+                <div className="flex justify-between">
+                  <legend className="text-[15px] font-bold">Elige tu pantaloneta</legend>
+                  <span className="kicker text-[11px] text-sky">Obligatorio</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label="Pantaloneta del combo">
+                  {combo.shorts.map(s => {
+                    const on = s.id === shortId
+                    return (
+                      <button key={s.id} type="button" role="radio" aria-checked={on} onClick={() => elegirShort(s.id)}
+                        className={`space-y-2 p-2 text-left transition ${on ? 'border-2 border-sky bg-sky/10' : 'border border-line hover:border-white'}`}>
+                        <span className="relative block aspect-[4/3] overflow-hidden bg-navy-900">
+                          {s.foto && <Image src={s.foto} alt="" fill sizes="160px" className="object-contain" />}
+                          {on && <span className="absolute left-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-sky text-navy-950"><Check size={12} aria-hidden /></span>}
+                        </span>
+                        <span className="block text-[13px] font-bold">{s.nombre}</span>
+                        <span className="block text-[11px] font-bold text-sky">{s.extra > 0 ? `+${formatoPrecio(s.extra)}` : 'Incluido'}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+
+              {short && (
+                <fieldset className="space-y-2.5">
+                  <div className="flex justify-between">
+                    <legend className="text-[15px] font-bold">Talla del short</legend>
+                    <span className="text-[12px] text-muted">Puede ser distinta a la camiseta</span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-2">
+                    {short.tallas.map(t => (
+                      <button key={t} type="button" aria-pressed={tallaShort === t} onClick={() => { setTallaShort(t); setAvisoShort(false) }}
+                        className={`h-11 text-sm font-bold transition ${tallaShort === t ? 'bg-white text-navy-950' : 'border border-line hover:border-white'}`}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              {avisoShort && <p role="alert" className="text-sm text-red-300">Elige la pantaloneta y su talla para continuar.</p>}
+
+              <div className="flex items-center gap-4">
+                <VistaPreviaShort numero={numeroShort} className="w-24 shrink-0" />
+                <label className="flex-1 space-y-2">
+                  <span className="kicker text-[11px] text-muted">Número del short (opcional)</span>
+                  <input value={numeroShort} onChange={e => setNumeroShort(normalizarNumero(e.target.value))} inputMode="numeric" placeholder="10" className="display w-24 border border-line bg-navy-950 px-4 py-3 text-2xl outline-none focus:border-sky" />
+                </label>
+              </div>
             </div>
           )}
         </div>

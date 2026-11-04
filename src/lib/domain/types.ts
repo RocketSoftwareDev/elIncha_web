@@ -68,6 +68,8 @@ export interface Producto {
   destacado: boolean
   fotos: string[]
   parchesPermitidos: Id[]
+  /** Existe la versión sin patrocinadores: el cliente elige con o sin (gratis). */
+  versionSinSponsors: boolean
 }
 
 /**
@@ -81,6 +83,20 @@ export interface Stock {
   cantidad: number
   /** null = el precio normal del producto. */
   precio: number | null
+}
+
+/**
+ * Pantaloneta que el cliente elige al pedir un combo. Su «extra» se suma al precio
+ * del combo y tiene sus propias tallas (puede ser distinta a la de la camiseta).
+ */
+export interface ShortCombo {
+  id: Id
+  nombre: string
+  foto: string
+  extra: number
+  tallas: string[]
+  activo: boolean
+  orden: number
 }
 
 export interface Combo {
@@ -106,6 +122,17 @@ export interface Ajustes {
   metodosPago: MetodoPago[]
   pasosComoComprar: string[]
   redes: { instagram: string; tiktok: string; facebook: string }
+  /** Página /soporte. La escribe el admin; ausente en datos viejos = vacía. */
+  soporte?: SeccionSoporte[]
+}
+
+/** Sección de /soporte (Cómo comprar, Guía de tallas, Envíos, Cambios, Lavado, o la que el admin cree). */
+export interface SeccionSoporte {
+  id: Id
+  titulo: string
+  /** Texto plano: línea en blanco = párrafo, «- » = viñeta, «a | b | c» = fila de tabla. */
+  contenido: string
+  visible: boolean
 }
 
 export interface Personalizacion {
@@ -113,6 +140,8 @@ export interface Personalizacion {
   numero: string
   numeroShort: string
   parches: Id[]
+  /** Solo si el producto tiene versión sin patrocinadores. */
+  sinSponsors: boolean
 }
 
 export interface PedidoItem {
@@ -131,6 +160,10 @@ export interface PedidoItem {
   productoId: Id | null
   /** Si salió del stock de entrega inmediata (no se fabrica: no va a la lista del proveedor). */
   stockId?: Id | null
+  sinSponsors?: boolean
+  /** Combo: la pantaloneta elegida y su talla (para el proveedor). */
+  shortNombre?: string | null
+  tallaShort?: string | null
 }
 
 export interface Pedido {
