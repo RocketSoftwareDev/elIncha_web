@@ -10,11 +10,21 @@ import { inputAIso } from '@/components/admin/fechas'
 import { requerirAdmin } from '@/lib/auth/sesion'
 import * as admin from '@/lib/data/admin'
 import { ErrorNegocio } from '@/lib/data/repo'
+import { MAX_CONTENIDO, MAX_TITULO } from '@/lib/domain/soporte'
 import type { EstadoPedido } from '@/lib/domain/types'
 
 export type Resultado = { ok?: string; error?: string } | null
 
-const fechaLocal = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Fecha inválida')
+/**
+ * Dólares con hasta 2 decimales: acepta «43.99» o «43,99» y guarda 43.99.
+ * Vacío no es válido (cada campo decide si es opcional).
+ */
+const dinero = z.preprocess(
+  v => (typeof v === 'string' ? v.trim().replace(',', '.') : v),
+  z.coerce.number({ message: 'Precio inválido' }).max(1000, 'Precio demasiado alto'),
+).transform(n => Math.round(n * 100) / 100)
+
+const fechaLocal =z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Fecha inválida')
 const dias = z.coerce.number().int().min(1).max(120)
 const marcado = (f: FormData, k: string) => f.get(k) === 'on'
 
@@ -97,7 +107,7 @@ const productoSchema = z.object({
   equipoId: z.string().min(1, 'Elige un equipo'),
   tipoId: z.string().min(1, 'Elige un tipo de prenda'),
   nombre: z.string().trim().min(2, 'Escribe el nombre de la opción').max(60),
-  precioEspecial: z.union([z.literal(''), z.coerce.number().positive('El precio especial debe ser mayor a 0')]),
+  precioEspecial: z.union([z.literal(''), dinero.refine(n => n > 0, 'El precio especial debe ser mayor a 0')]),
 })
 
 export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<Resultado> {
@@ -124,6 +134,7 @@ export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<
       destacado: marcado(f, 'destacado'),
       fotos: existente?.fotos ?? [],
       parchesPermitidos: f.getAll('parches').map(String),
+      versionSinSponsors: marcado(f, 'versionSinSponsors'),
     })
   } catch (e) {
     return { error: errorDe(e) }
@@ -170,7 +181,7 @@ export async function subirFotoAccion(_: Resultado, f: FormData): Promise<Result
 export async function subirImagenAccion(_: Resultado, f: FormData): Promise<Resultado> {
   await requerirAdmin()
   try {
-    const destino = z.enum(['liga', 'equipo']).parse(f.get('destino'))
+    const destino = z.enum(['liga', 'equipo', 'short']).parse(f.get('destino'))
     const id = z.string().min(1).max(64).parse(f.get('id'))
     const archivo = f.get('imagen')
     if (!(archivo instanceof Blob) || archivo.size === 0) throw new ErrorNegocio('Elige una imagen')
@@ -178,6 +189,7 @@ export async function subirImagenAccion(_: Resultado, f: FormData): Promise<Resu
     const datos = new Uint8Array(await archivo.arrayBuffer())
     if (!esWebp(datos)) throw new ErrorNegocio('Formato no válido')
     if (destino === 'liga') await admin.cambiarImagenLiga(id, datos)
+    else if (destino === 'short') await admin.cambiarFotoShort(id, datos)
     else await admin.cambiarEscudo(id, datos)
   } catch (e) {
     return { error: errorDe(e) }
@@ -189,6 +201,16 @@ export async function subirImagenAccion(_: Resultado, f: FormData): Promise<Resu
 export async function quitarEscudoAccion(f: FormData) {
   await requerirAdmin()
   await admin.quitarEscudo(z.string().min(1).parse(f.get('id')))
+  refrescar()
+}
+
+export async function moverFotoAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.moverFoto(
+    z.string().min(1).max(64).parse(f.get('productoId')),
+    z.string().url().or(z.string().startsWith('/')).parse(f.get('url')),
+    z.coerce.number().int().min(0).max(5).parse(f.get('destino')),
+  )
   refrescar()
 }
 
@@ -246,7 +268,95 @@ export async function crearEquipoAccion(_: Resultado, f: FormData): Promise<Resu
 
 // ---------- Precios, combos y parches ----------
 
-const precio = z.coerce.number().positive('Los precios deben ser mayores a 0').max(1000)
+const precio = dinero.refine(n => n > 0, 'Los precios deben ser mayores a 0')
+const tallasDe = (f: FormData) => f.getAll('tallas').map(String)
+
+const tipoSchema = (f: FormData) => ({
+  nombre: z.string().trim().min(2, 'Escribe el nombre del tipo').max(40).parse(f.get('nombre')),
+  precio: precio.parse(f.get('precio')),
+  tallas: tallasDe(f),
+  aceptaPersonalizacion: marcado(f, 'aceptaPersonalizacion'),
+  esShort: marcado(f, 'esShort'),
+})
+
+export async function crearTipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.crearTipo(tipoSchema(f))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Tipo agregado' }
+}
+
+export async function editarTipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.editarTipo(z.string().min(1).max(64).parse(f.get('id')), tipoSchema(f))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Tipo guardado' }
+}
+
+export async function eliminarTipoAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.eliminarTipo(z.string().min(1).max(64).parse(f.get('id')))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Tipo quitado' }
+}
+
+// ---------- Pantalonetas del combo ----------
+
+const extraShort = dinero.refine(n => n >= 0, 'El extra no puede ser negativo')
+
+export async function crearShortAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.crearShort({
+      nombre: z.string().trim().min(2, 'Escribe el nombre de la pantaloneta').max(40).parse(f.get('nombre')),
+      extra: extraShort.parse(f.get('extra') || '0'),
+      tallas: tallasDe(f),
+    })
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Pantaloneta agregada. Súbele su foto.' }
+}
+
+export async function guardarShortAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.guardarShort(z.string().min(1).max(64).parse(f.get('id')), {
+      nombre: z.string().trim().min(2, 'Escribe el nombre de la pantaloneta').max(40).parse(f.get('nombre')),
+      extra: extraShort.parse(f.get('extra') || '0'),
+      tallas: tallasDe(f),
+      activo: marcado(f, 'activo'),
+    })
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Pantaloneta guardada' }
+}
+
+export async function eliminarShortAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    await admin.eliminarShort(z.string().min(1).max(64).parse(f.get('id')))
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Pantaloneta quitada' }
+}
 
 export async function guardarPreciosAccion(_: Resultado, f: FormData): Promise<Resultado> {
   await requerirAdmin()
@@ -301,8 +411,8 @@ export async function crearParcheAccion(_: Resultado, f: FormData): Promise<Resu
 
 // Vacío = el precio normal de la camiseta.
 const precioOpcional = z.preprocess(
-  v => (v === '' || v === null ? null : v),
-  z.coerce.number().positive('El precio debe ser mayor a 0').max(500).nullable(),
+  v => (v === '' || v === null ? null : typeof v === 'string' ? v.trim().replace(',', '.') : v),
+  z.coerce.number().positive('El precio debe ser mayor a 0').max(500).transform(n => Math.round(n * 100) / 100).nullable(),
 )
 
 export async function agregarStockAccion(_: Resultado, f: FormData): Promise<Resultado> {
@@ -343,6 +453,36 @@ export async function precioStockAccion(_: Resultado, f: FormData): Promise<Resu
 export async function eliminarStockAccion(f: FormData) {
   await requerirAdmin()
   await admin.eliminarStock(z.string().min(1).max(64).parse(f.get('id')))
+  refrescar()
+}
+
+// ---------- Soporte ----------
+
+export async function guardarSeccionAccion(_: Resultado, f: FormData): Promise<Resultado> {
+  await requerirAdmin()
+  try {
+    const id = z.string().max(64).parse(f.get('id') ?? '')
+    await admin.guardarSeccion(id || null, {
+      titulo: z.string().trim().min(2, 'Escribe el título').max(MAX_TITULO, `Título de máximo ${MAX_TITULO} caracteres`).parse(f.get('titulo')),
+      contenido: z.string().max(MAX_CONTENIDO, `Texto de máximo ${MAX_CONTENIDO} caracteres`).parse(f.get('contenido') ?? ''),
+      visible: marcado(f, 'visible'),
+    })
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
+  refrescar()
+  return { ok: 'Sección guardada' }
+}
+
+export async function moverSeccionAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.moverSeccion(z.string().min(1).max(64).parse(f.get('id')), f.get('delta') === '1' ? 1 : -1)
+  refrescar()
+}
+
+export async function eliminarSeccionAccion(f: FormData) {
+  await requerirAdmin()
+  await admin.eliminarSeccion(z.string().min(1).max(64).parse(f.get('id')))
   refrescar()
 }
 

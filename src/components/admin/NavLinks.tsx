@@ -1,6 +1,6 @@
 'use client'
 
-import { LayoutDashboard, MessageCircle, Package, Settings, Shirt, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, LifeBuoy, MessageCircle, Package, Settings, Shirt, Tag, Timer, Trophy, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -22,7 +22,13 @@ const GRUPOS: { titulo: string; items: { href: string; label: string; icono: Luc
       { href: '/admin/precios', label: 'Precios y combos', icono: Tag },
     ],
   },
-  { titulo: 'Tienda', items: [{ href: '/admin/ajustes', label: 'Ajustes y pagos', icono: Settings }] },
+  {
+    titulo: 'Tienda',
+    items: [
+      { href: '/admin/ajustes', label: 'Ajustes y pagos', icono: Settings },
+      { href: '/admin/soporte', label: 'Soporte', icono: LifeBuoy },
+    ],
+  },
 ]
 
 export function NavLinks() {

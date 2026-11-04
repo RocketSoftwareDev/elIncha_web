@@ -4,7 +4,7 @@ import 'server-only'
 // con él: sirve para ver y probar la tienda y el admin sin back ni Docker.
 
 import type {
-  Ajustes, Combo, Drop, Equipo, Liga, Parche, Pedido, Producto, Stock, TipoPrenda,
+  Ajustes, Combo, Drop, Equipo, Liga, Parche, Pedido, Producto, ShortCombo, Stock, TipoPrenda,
 } from '@/lib/domain/types'
 
 export interface MockDb {
@@ -16,6 +16,7 @@ export interface MockDb {
   productos: Producto[]
   combos: Combo[]
   stock: Stock[]
+  shorts: ShortCombo[]
   ajustes: Ajustes
   pedidos: Pedido[]
   secuenciaPedido: number
@@ -56,11 +57,12 @@ function semilla(): MockDb {
     slug: string, equipo: string, tipo: string, nombre: string, fotos: string[], parchesIds: string[], extra: Partial<Producto> = {},
   ): Producto => ({
     id: `pr-${slug}`, slug, equipoId: `e-${equipo}`, tipoId: `t-${tipo}`, nombre, precioEspecial: null,
-    visible: true, destacado: false, fotos: fotos.map(f => `/mock/${f}`), parchesPermitidos: parchesIds.map(x => `p-${x}`), ...extra,
+    visible: true, destacado: false, fotos: fotos.map(f => `/mock/${f}`), parchesPermitidos: parchesIds.map(x => `p-${x}`),
+    versionSinSponsors: false, ...extra,
   })
 
   const productos: Producto[] = [
-    p('real-madrid-local-25-26', 'real-madrid', 'player', 'Local 25/26', ['detalle-1.jpg', 'prod-1.jpg', 'detalle-2.jpg'], ['ucl', 'laliga'], { destacado: true }),
+    p('real-madrid-local-25-26', 'real-madrid', 'player', 'Local 25/26', ['detalle-1.jpg', 'prod-1.jpg', 'detalle-2.jpg'], ['ucl', 'laliga'], { destacado: true, versionSinSponsors: true }),
     p('real-madrid-short-local', 'real-madrid', 'short', 'Short Local 25/26', ['short.jpg'], []),
     p('barcelona-local-25-26', 'barcelona', 'player', 'Local 25/26', ['prod-2.jpg', 'detalle-3.jpg'], ['ucl', 'laliga']),
     p('barcelona-visitante-25-26', 'barcelona', 'player', 'Visitante 25/26', ['prod-5.jpg'], ['ucl', 'laliga']),
@@ -83,6 +85,12 @@ function semilla(): MockDb {
   ]
 
   const combos: Combo[] = [{ id: 'c-kit', nombre: 'Kit completo', precio: 55, activo: true, tipos: ['t-player', 't-short'] }]
+
+  const shorts: ShortCombo[] = [
+    { id: 'sh-player', nombre: 'Short Player', foto: '/mock/short.jpg', extra: 0, tallas: ['S', 'M', 'L', 'XL'], activo: true, orden: 0 },
+    { id: 'sh-fan', nombre: 'Short Fan', foto: '/mock/short.jpg', extra: 0, tallas: ['S', 'M', 'L', 'XL', 'XXL'], activo: true, orden: 1 },
+    { id: 'sh-retro', nombre: 'Short Retro', foto: '/mock/short.jpg', extra: 3, tallas: ['M', 'L', 'XL'], activo: true, orden: 2 },
+  ]
 
   const drops: Drop[] = [
     { id: 'd-2026-11', nombre: 'Drop Noviembre', abreEn: '2026-10-01T05:00:00Z', cierraEn: '2026-10-31T04:59:00Z', envioEn: '2026-10-31T15:00:00Z', llegadaMinDias: 20, llegadaMaxDias: 30, estado: 'abierto', mostrarCuentaRegresiva: true },
@@ -117,7 +125,7 @@ function semilla(): MockDb {
 
   const pedidos: Pedido[] = [
     pedido(142, 'Carlos V.', 'Cdla. Las Brisas, Machala', 135, 'por_confirmar', 0, [
-      { id: 'i1', descripcion: 'Combo Kit completo', detalle: 'Real Madrid Local 25/26 + Short Local · Talla L', talla: 'L', cantidad: 1, dorsalNombre: 'VERA', dorsalNumero: '10', shortNumero: '10', parches: [{ nombre: 'Champions League', precio: 1 }], precioUnitario: 56, subtotal: 56, comboId: 'c-kit', productoId: 'pr-real-madrid-local-25-26' },
+      { id: 'i1', descripcion: 'Combo Kit completo', detalle: 'Real Madrid Local 25/26 + Short Player · Talla L · Short M', talla: 'L', cantidad: 1, dorsalNombre: 'VERA', dorsalNumero: '10', shortNumero: '10', parches: [{ nombre: 'Champions League', precio: 1 }], precioUnitario: 56, subtotal: 56, comboId: 'c-kit', productoId: 'pr-real-madrid-local-25-26', shortNombre: 'Short Player', tallaShort: 'M' },
       { id: 'i2', descripcion: 'Barcelona Visitante 25/26', detalle: 'Camiseta Player · Talla M', talla: 'M', cantidad: 1, dorsalNombre: null, dorsalNumero: null, shortNumero: null, parches: [], precioUnitario: 40, subtotal: 40, comboId: null, productoId: 'pr-barcelona-visitante-25-26' },
       { id: 'i3', descripcion: 'Ecuador Mundial 2002', detalle: 'Retro · Talla XL', talla: 'XL', cantidad: 1, dorsalNombre: 'MOISÉS', dorsalNumero: '7', shortNumero: null, parches: [{ nombre: 'Copa Mundial', precio: 1 }], precioUnitario: 39, subtotal: 39, comboId: null, productoId: 'pr-ecuador-mundial-2002' },
     ]),
@@ -136,7 +144,7 @@ function semilla(): MockDb {
     { id: 's-barca-s', productoId: 'pr-barcelona-local-25-26', talla: 'S', cantidad: 1, precio: null },
   ]
 
-  return { drops, ligas, equipos, tipos, parches, productos, combos, stock, ajustes, pedidos, secuenciaPedido: 142 }
+  return { drops, ligas, equipos, tipos, parches, productos, combos, stock, shorts, ajustes, pedidos, secuenciaPedido: 142 }
 }
 
 // Sobrevive a la recarga en caliente de `next dev`.

@@ -1,35 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { calcularLinea, calcularTotal, formatoPrecio, type Catalogo, type LineaCarrito } from './pricing'
-import type { Combo, Parche, Producto, Stock, TipoPrenda } from './types'
+import { calcularLinea, calcularTotal, formatoPrecio, partesPrecio, type Catalogo, type LineaCarrito } from './pricing'
+import type { Combo, Parche, Personalizacion, Producto, ShortCombo, Stock, TipoPrenda } from './types'
 
 const player: TipoPrenda = { id: 't-player', nombre: 'Camiseta Player', precio: 40, tallas: [], aceptaPersonalizacion: true, esShort: false, orden: 1 }
 const retro: TipoPrenda = { id: 't-retro', nombre: 'Retro', precio: 38, tallas: [], aceptaPersonalizacion: true, esShort: false, orden: 2 }
 const champions: Parche = { id: 'p-ucl', nombre: 'Champions League', precio: 1, activo: true }
 const mundial: Parche = { id: 'p-wc', nombre: 'Copa Mundial', precio: 1, activo: true }
 const kit: Combo = { id: 'c-kit', nombre: 'Kit completo', precio: 55, activo: true, tipos: ['t-player', 't-short'] }
+const shortPlayer: ShortCombo = { id: 'sh-player', nombre: 'Short Player', foto: '', extra: 0, tallas: ['S', 'M', 'L'], activo: true, orden: 0 }
+const shortRetro: ShortCombo = { id: 'sh-retro', nombre: 'Short Retro', foto: '', extra: 3, tallas: ['M', 'L'], activo: true, orden: 1 }
+const shortViejo: ShortCombo = { id: 'sh-viejo', nombre: 'Short viejo', foto: '', extra: 0, tallas: ['M'], activo: false, orden: 2 }
 
 const producto = (p: Partial<Producto>): Producto => ({
   id: 'x', slug: 'x', equipoId: 'e', tipoId: 't-player', nombre: 'Local', precioEspecial: null,
-  visible: true, destacado: false, fotos: [], parchesPermitidos: ['p-ucl'], ...p,
+  visible: true, destacado: false, fotos: [], parchesPermitidos: ['p-ucl'], versionSinSponsors: false, ...p,
 })
 
 const madrid = producto({ id: 'rm', tipoId: 't-player' })
 const ecuador = producto({ id: 'ec', tipoId: 't-retro', parchesPermitidos: ['p-wc'] })
-const especial = producto({ id: 'esp', precioEspecial: 45 })
+const especial = producto({ id: 'esp', precioEspecial: 45, versionSinSponsors: true })
+const decimal = producto({ id: 'dec', precioEspecial: 43.99 })
 const stockM: Stock = { id: 's-rm-m', productoId: 'rm', talla: 'M', cantidad: 3, precio: null }
 const stockRebajado: Stock = { id: 's-rm-l', productoId: 'rm', talla: 'L', cantidad: 1, precio: 30 }
 
 const catalogo: Catalogo = {
-  productos: new Map([madrid, ecuador, especial].map(p => [p.id, p])),
+  productos: new Map([madrid, ecuador, especial, decimal].map(p => [p.id, p])),
   tipos: new Map([player, retro].map(t => [t.id, t])),
   parches: new Map([champions, mundial].map(p => [p.id, p])),
   combos: new Map([[kit.id, kit]]),
   stock: new Map([[stockM.id, stockM], [stockRebajado.id, stockRebajado]]),
+  shorts: new Map([shortPlayer, shortRetro, shortViejo].map(s => [s.id, s])),
 }
 
-const linea = (l: Partial<LineaCarrito>): LineaCarrito => ({
-  key: 'k', productoId: 'rm', comboId: null, stockId: null, talla: 'L', cantidad: 1,
-  personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [] }, ...l,
+const linea = (l: Omit<Partial<LineaCarrito>, 'personalizacion'> & { personalizacion?: Partial<Personalizacion> } = {}): LineaCarrito => ({
+  key: 'k', productoId: 'rm', comboId: null, stockId: null, shortId: null, tallaShort: '', talla: 'L', cantidad: 1,
+  ...l,
+  personalizacion: { nombre: '', numero: '', numeroShort: '', parches: [], sinSponsors: false, ...l.personalizacion },
 })
 
 describe('calcularLinea', () => {
@@ -49,7 +55,7 @@ describe('calcularLinea', () => {
   })
 
   it('el combo cobra su precio más los parches', () => {
-    const l = linea({ comboId: 'c-kit', personalizacion: { nombre: 'VERA', numero: '10', numeroShort: '10', parches: ['p-ucl'] } })
+    const l = linea({ comboId: 'c-kit', shortId: 'sh-player', tallaShort: 'M', personalizacion: { nombre: 'VERA', numero: '10', numeroShort: '10', parches: ['p-ucl'] } })
     expect(calcularLinea(l, catalogo).unitario).toBe(56)
   })
 
@@ -80,10 +86,51 @@ describe('entrega inmediata (stock)', () => {
   })
 })
 
+describe('combo con pantaloneta', () => {
+  const combo = (l: Parameters<typeof linea>[0] = {}) => linea({ comboId: 'c-kit', shortId: 'sh-player', tallaShort: 'S', ...l })
+
+  it('suma el extra de la pantaloneta elegida', () => {
+    const r = calcularLinea(combo({ shortId: 'sh-retro', tallaShort: 'M' }), catalogo)
+    expect(r.unitario).toBe(58)
+    expect(r.short?.nombre).toBe('Short Retro')
+  })
+
+  it('la talla del short puede ser distinta a la de la camiseta', () => {
+    expect(calcularLinea(combo({ talla: 'L', tallaShort: 'S' }), catalogo).unitario).toBe(55)
+  })
+
+  it('rechaza combo sin pantaloneta, talla que no tiene, o pantaloneta inactiva', () => {
+    expect(() => calcularLinea(combo({ shortId: null }), catalogo)).toThrow()
+    expect(() => calcularLinea(combo({ shortId: 'sh-retro', tallaShort: 'S' }), catalogo)).toThrow()
+    expect(() => calcularLinea(combo({ shortId: 'sh-viejo', tallaShort: 'M' }), catalogo)).toThrow()
+  })
+
+  it('rechaza pantaloneta sin combo o un combo para un tipo que no lo lleva', () => {
+    expect(() => calcularLinea(linea({ shortId: 'sh-player', tallaShort: 'M' }), catalogo)).toThrow()
+    expect(() => calcularLinea(combo({ productoId: 'ec' }), catalogo)).toThrow()
+  })
+})
+
+describe('sponsors', () => {
+  const sin = { nombre: '', numero: '', numeroShort: '', parches: [], sinSponsors: true }
+  it('sin sponsors es gratis si la camiseta lo ofrece', () => {
+    expect(calcularLinea(linea({ productoId: 'esp', personalizacion: sin }), catalogo).unitario).toBe(45)
+  })
+  it('rechaza «sin sponsors» si la camiseta no tiene esa versión', () => {
+    expect(() => calcularLinea(linea({ personalizacion: sin }), catalogo)).toThrow()
+  })
+})
+
+describe('precios con centavos', () => {
+  it('43.99 × 3 no deja decimales sueltos', () => {
+    expect(calcularLinea(linea({ productoId: 'dec', cantidad: 3 }), catalogo).subtotal).toBe(131.97)
+  })
+})
+
 describe('calcularTotal', () => {
   it('reproduce el pedido de ejemplo del diseño: $135', () => {
     const r = calcularTotal([
-      linea({ key: 'a', comboId: 'c-kit', personalizacion: { nombre: 'VERA', numero: '10', numeroShort: '', parches: ['p-ucl'] } }),
+      linea({ key: 'a', comboId: 'c-kit', shortId: 'sh-player', tallaShort: 'M', personalizacion: { nombre: 'VERA', numero: '10', numeroShort: '', parches: ['p-ucl'] } }),
       linea({ key: 'b', productoId: 'rm' }),
       linea({ key: 'c', productoId: 'ec', personalizacion: { nombre: 'MOISÉS', numero: '7', numeroShort: '', parches: ['p-wc'] } }),
     ], catalogo)
@@ -93,8 +140,15 @@ describe('calcularTotal', () => {
 })
 
 describe('formatoPrecio', () => {
-  it('muestra enteros sin decimales y decimales con coma', () => {
-    expect(formatoPrecio(40)).toBe('$40')
-    expect(formatoPrecio(67.5)).toBe('$67,50')
+  it('siempre con 2 decimales y punto', () => {
+    expect(formatoPrecio(40)).toBe('$40.00')
+    expect(formatoPrecio(67.5)).toBe('$67.50')
+    expect(formatoPrecio(43.99)).toBe('$43.99')
+    expect(formatoPrecio(0.1 + 0.2)).toBe('$0.30')
+  })
+
+  it('separa entero y centavos para dibujarlos', () => {
+    expect(partesPrecio(54)).toEqual({ entero: '54', centavos: '00' })
+    expect(partesPrecio(43.99)).toEqual({ entero: '43', centavos: '99' })
   })
 })

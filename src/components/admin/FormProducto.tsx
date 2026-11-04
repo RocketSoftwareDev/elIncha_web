@@ -6,6 +6,7 @@ import { useActionState, useState } from 'react'
 import { guardarProductoAccion } from '@/app/admin/acciones'
 import { formatoPrecio } from '@/lib/domain/pricing'
 import type { Equipo, Liga, Parche, Producto, TipoPrenda } from '@/lib/domain/types'
+import { SelectBuscable } from './SelectBuscable'
 import { SubidaFotos } from './SubidaFotos'
 import { Aviso, Campo, Interruptor, input } from './ui'
 
@@ -30,13 +31,14 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
   const [equipoId, setEquipoId] = useState(equipoInicial?.id ?? deLiga[0]?.id ?? '')
   const [tipoId, setTipoId] = useState(producto?.tipoId ?? tipos[0]?.id ?? '')
   const [nombre, setNombre] = useState(producto?.nombre ?? '')
-  const [especial, setEspecial] = useState(producto?.precioEspecial?.toString() ?? '')
+  const [especial, setEspecial] = useState(producto?.precioEspecial?.toFixed(2) ?? '')
   const [elegidos, setElegidos] = useState<string[]>(producto?.parchesPermitidos ?? [])
 
   const tipo = tipos.find(t => t.id === tipoId)
   const liga = ligas.find(l => l.id === ligaId)
   const equipo = equipos.find(e => e.id === equipoId)
-  const precio = Number(especial) > 0 ? Number(especial) : tipo?.precio ?? 0
+  const especialNum = Number(especial.replace(',', '.'))
+  const precio = especialNum > 0 ? especialNum : tipo?.precio ?? 0
   const nombresParches = parches.filter(p => elegidos.includes(p.id)).map(p => p.nombre)
 
   const alternar = (id: string) => setElegidos(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]))
@@ -71,17 +73,17 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
           <section className={tarjeta}>
             <h2 className="text-base font-bold">1. ¿Dónde aparece?</h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Campo label="Liga">
-                <select value={ligaId} onChange={e => { setLigaId(e.target.value); setEquipoId(equipos.find(x => x.ligaId === e.target.value)?.id ?? '') }} className={input}>
-                  {ligas.map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
-                </select>
-              </Campo>
-              <Campo label="Equipo">
-                <select name="equipoId" value={equipoId} onChange={e => setEquipoId(e.target.value)} className={input} required>
-                  {deLiga.length === 0 && <option value="">Esta liga no tiene equipos</option>}
-                  {deLiga.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                </select>
-              </Campo>
+              <div className="flex flex-col gap-1.5">
+                <span className="kicker text-[10px] text-ink-soft">Liga</span>
+                <SelectBuscable etiqueta="Liga" vacio="Elige liga…" valor={ligaId}
+                  opciones={ligas.map(l => ({ id: l.id, nombre: l.nombre, imagen: l.foto }))}
+                  onChange={id => { setLigaId(id); setEquipoId(equipos.find(x => x.ligaId === id)?.id ?? '') }} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="kicker text-[10px] text-ink-soft">Equipo</span>
+                <SelectBuscable key={ligaId} name="equipoId" etiqueta="Equipo" vacio={deLiga.length ? 'Elige equipo…' : 'Esta liga no tiene equipos'} valor={equipoId}
+                  opciones={deLiga.map(e => ({ id: e.id, nombre: e.nombre, imagen: e.escudo }))} onChange={setEquipoId} />
+              </div>
             </div>
             <Campo label="Nombre de la opción">
               <input name="nombre" value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Local 25/26" required maxLength={60} className={input} />
@@ -109,7 +111,7 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
                 </span>
               </Campo>
               <Campo label="Precio especial (opcional)">
-                <input name="precioEspecial" type="number" min={1} step="0.5" value={especial} onChange={e => setEspecial(e.target.value)} placeholder="Ej. 45" className={input} />
+                <input name="precioEspecial" inputMode="decimal" pattern="\d{1,4}([.,]\d{1,2})?" value={especial} onChange={e => setEspecial(e.target.value)} placeholder="Ej. 43.99" className={input} />
               </Campo>
             </div>
           </section>
@@ -129,6 +131,8 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
                 {tipo?.aceptaPersonalizacion ? 'ACTIVO' : 'NO APLICA'}
               </span>
             </div>
+            <Interruptor name="versionSinSponsors" defaultChecked={producto?.versionSinSponsors ?? false}
+              label="Con o sin sponsors" ayuda="Si la tienes también sin patrocinadores, el cliente elige con una viñeta. Sin costo." />
             <fieldset className="space-y-2">
               <legend className="kicker text-[10px] text-ink-soft">Parches permitidos · {formatoPrecio(parches[0]?.precio ?? 1)} c/u</legend>
               <div className="flex flex-wrap gap-2">
@@ -152,7 +156,8 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
               <h2 className="text-base font-bold">4. Fotos</h2>
               <span className="kicker text-[10px] text-ink-soft">{producto?.fotos.length ?? 0} / 6</span>
             </div>
-            <SubidaFotos productoId={producto?.id ?? null} fotos={producto?.fotos ?? []} habilitada={subirFotos} />
+            <SubidaFotos productoId={producto?.id ?? null} fotos={producto?.fotos ?? []} habilitada={subirFotos}
+              muestra={{ titulo: `${equipo?.nombre ?? ''} ${nombre}`.trim() || 'Camiseta', liga: liga?.nombre ?? '', precio }} />
           </section>
 
           <section className={tarjeta}>

@@ -1,9 +1,11 @@
 'use client'
 
 import Image from 'next/image'
-import { PencilLine } from 'lucide-react'
+import { Maximize2, PencilLine } from 'lucide-react'
+import { useState } from 'react'
 import { VistaPreviaCamiseta, VistaPreviaShort } from '@/components/dorsal/VistaPreviaDorsal'
 import { useDorsal } from './producto/DorsalContexto'
+import { Visor } from './Visor'
 
 const FANTASMA = 'rgb(10 26 68 / 0.22)'
 
@@ -19,6 +21,7 @@ export function Galeria({ fotos, alt, personalizable, esShort }: { fotos: string
   const total = fotos.length + offset
   const actual = Math.min(diapositiva, total - 1)
   const enEscena = conEscena && actual === 0
+  const [visor, setVisor] = useState<number | null>(null)
 
   return (
     // Fija al bajar: la vista previa sigue a la vista mientras se completa el formulario.
@@ -65,9 +68,15 @@ export function Galeria({ fotos, alt, personalizable, esShort }: { fotos: string
             <p className="kicker absolute bottom-5 left-6 z-10 text-[10px] text-muted md:text-[11px]">Vista previa referencial · se actualiza mientras escribes</p>
           </div>
         ) : (
-          <Image src={fotos[actual - offset]} alt={alt} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
+          // La foto se ve completa y centrada (sin recorte ni zoom); al tocarla se abre el visor.
+          <button type="button" onClick={() => setVisor(actual - offset)} aria-label={`Ampliar foto ${actual - offset + 1}`} className="group absolute inset-0 cursor-zoom-in bg-navy-900">
+            <Image src={fotos[actual - offset]} alt={alt} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-contain" />
+            <span className="absolute right-3 top-3 grid size-10 place-items-center rounded-full bg-navy-950/80 text-white transition group-hover:bg-navy-950"><Maximize2 size={18} aria-hidden /></span>
+            {fotos.length > 1 && <span className="kicker absolute bottom-3 left-3 bg-navy-950/80 px-2.5 py-1.5 text-[11px] text-white">{actual - offset + 1} / {fotos.length}</span>}
+          </button>
         )}
       </div>
+      {visor !== null && <Visor fotos={fotos} inicial={visor} alt={alt} onCerrar={() => setVisor(null)} />}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { enviarPedido } from '@/app/(tienda)/acciones'
 import { articulosCarrito, totalCarrito, useCarrito } from '@/lib/cart/store'
+import { Precio } from '@/components/Precio'
 import { formatoPrecio } from '@/lib/domain/pricing'
 
 interface Props {
@@ -49,7 +50,11 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
     iniciar(async () => {
       const r = await enviarPedido({
         ...datos,
-        lineas: lineas.map(({ key, productoId, comboId, stockId, talla, cantidad, personalizacion }) => ({ key, productoId, comboId, stockId: stockId ?? null, talla, cantidad, personalizacion })),
+        // Los carritos guardados antes de las pantalonetas no traen esos campos.
+        lineas: lineas.map(({ key, productoId, comboId, stockId, shortId, tallaShort, talla, cantidad, personalizacion }) => ({
+          key, productoId, comboId, stockId: stockId ?? null, shortId: shortId ?? null, tallaShort: tallaShort ?? '', talla, cantidad,
+          personalizacion: { ...personalizacion, sinSponsors: personalizacion.sinSponsors ?? false },
+        })),
       })
       if (!r.ok) return setError(r.error)
       setEnviado({ codigo: r.codigo, url: r.whatsappUrl })
@@ -91,7 +96,7 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <div className="flex justify-between gap-3">
                       <p className="font-bold">{l.titulo}</p>
-                      <p className="display text-2xl">{formatoPrecio(l.unitario * l.cantidad)}</p>
+                      <Precio valor={l.unitario * l.cantidad} className="display text-2xl" />
                     </div>
                     <p className="text-[13px] text-ink-soft">{l.detalle}</p>
                     {!abiertoDrop && !l.stockId && (
@@ -129,7 +134,7 @@ export function CarritoPanel({ dropNombre, llegaEntre, montoReserva, instagram }
               </div>
               <div className="flex items-end justify-between">
                 <span className="kicker">Total a confirmar</span>
-                <span className="display text-5xl">{formatoPrecio(total)}</span>
+                <Precio valor={total} className="display text-5xl" />
               </div>
               {error && <p role="alert" className="bg-red-100 px-3 py-2 text-sm text-red-800">{error}</p>}
               {bloqueado && (

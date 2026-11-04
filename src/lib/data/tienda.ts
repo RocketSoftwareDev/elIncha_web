@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { aceptaPedidos } from '@/lib/domain/drop'
 import { normalizarNombre, normalizarNumero, validarNombre, validarNumero } from '@/lib/domain/dorsal'
 import { calcularLinea, type Catalogo } from '@/lib/domain/pricing'
+import { seccionesPublicas } from '@/lib/domain/soporte'
 import type { Drop, PedidoItem, ProductoVista } from '@/lib/domain/types'
 import { armarMensaje, enlaceWhatsapp } from '@/lib/domain/whatsapp'
 import { catalogo, ErrorNegocio, repo, type DatosCatalogo } from './repo'
@@ -20,6 +21,11 @@ export async function ajustesPublicos() {
   return (await catalogo()).ajustes
 }
 
+/** Secciones publicadas de /soporte. Sin ninguna, la página no existe. */
+export async function soportePublico() {
+  return seccionesPublicas((await catalogo()).ajustes.soporte)
+}
+
 export async function ligasVisibles() {
   return (await catalogo()).ligas.filter(l => l.visible).sort((a, b) => a.orden - b.orden)
 }
@@ -30,6 +36,11 @@ export async function tipos() {
 
 export async function combosActivos() {
   return (await catalogo()).combos.filter(c => c.activo)
+}
+
+/** Pantalonetas que el cliente puede elegir al pedir un combo. */
+export async function shortsActivos() {
+  return (await catalogo()).shorts.filter(s => s.activo && s.tallas.length > 0).sort((a, b) => a.orden - b.orden)
 }
 
 function vista(c: DatosCatalogo, id: string): ProductoVista | null {
@@ -81,6 +92,7 @@ function catalogoPrecios(c: DatosCatalogo): Catalogo {
     parches: new Map(c.parches.map(p => [p.id, p])),
     combos: new Map(c.combos.map(x => [x.id, x])),
     stock: new Map(c.stock.map(s => [s.id, s])),
+    shorts: new Map(c.shorts.map(s => [s.id, s])),
   }
 }
 
@@ -91,6 +103,8 @@ const lineaSchema = z.object({
   productoId: z.string().max(64),
   comboId: z.string().max(64).nullable(),
   stockId: z.string().max(64).nullable().default(null),
+  shortId: z.string().max(64).nullable().default(null),
+  tallaShort: z.string().max(4).default(''),
   talla: z.string().max(4),
   cantidad: z.number().int().min(1).max(10),
   personalizacion: z.object({
@@ -98,6 +112,7 @@ const lineaSchema = z.object({
     numero: z.string().max(4),
     numeroShort: z.string().max(4),
     parches: z.array(z.string().max(64)).max(6),
+    sinSponsors: z.boolean().default(false),
   }),
 })
 
@@ -152,7 +167,7 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
       if (!s || s.cantidad < l.cantidad) return { ok: false, error: `Ya no quedan suficientes ${v.equipo.nombre} ${producto.nombre} talla ${l.talla} de entrega inmediata.` }
       let calc
       try {
-        calc = calcularLinea(l, cat) // rechaza nombre, número, parches o combo en una prenda de stock
+        calc = calcularLinea(l, cat) // rechaza nombre, número, parches, combo o «sin sponsors» en una prenda de stock
       } catch {
         return { ok: false, error: 'Las camisetas de entrega inmediata no se personalizan.' }
       }
@@ -187,13 +202,20 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
     try {
       calc = calcularLinea({ ...l, personalizacion: { ...l.personalizacion, nombre, numero, numeroShort } }, cat)
     } catch {
-      return { ok: false, error: 'Una de las opciones ya no está disponible.' }
+      return { ok: false, error: 'Una de las opciones ya no está disponible (combo, pantaloneta, talla o sponsors).' }
     }
     const combo = l.comboId ? cat.combos.get(l.comboId) : undefined
+    const sinSponsors = l.personalizacion.sinSponsors
+    const detalle = [
+      combo && calc.short ? `${v.equipo.nombre} ${producto.nombre} + ${calc.short.nombre}` : tipo.nombre,
+      `Talla ${l.talla}`,
+      combo && calc.short ? `Short ${l.tallaShort}` : null,
+      sinSponsors ? 'Sin sponsors' : null,
+    ].filter(Boolean).join(' · ')
     items.push({
       id: crypto.randomUUID(),
       descripcion: combo ? `Combo ${combo.nombre}` : `${v.equipo.nombre} ${producto.nombre}`,
-      detalle: combo ? `${v.equipo.nombre} ${producto.nombre} + Short · Talla ${l.talla}` : `${tipo.nombre} · Talla ${l.talla}`,
+      detalle,
       talla: l.talla,
       cantidad: l.cantidad,
       dorsalNombre: nombre || null,
@@ -205,6 +227,9 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
       comboId: combo?.id ?? null,
       productoId: producto.id,
       stockId: null,
+      sinSponsors,
+      shortNombre: calc.short?.nombre ?? null,
+      tallaShort: calc.short ? l.tallaShort : null,
     })
   }
 
@@ -227,7 +252,7 @@ export async function crearPedido(entrada: unknown, contexto: { ip: string }): P
     lineas: items.map(i => ({
       cantidad: i.cantidad,
       titulo: i.descripcion,
-      detalle: i.detalle.replace(' · Talla ', ' · '),
+      detalle: i.detalle,
       subtotal: i.subtotal,
       dorsal: describirDorsal(i),
     })),

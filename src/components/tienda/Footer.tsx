@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { FacebookLogo, InstagramLogo, TiktokLogo, WhatsappLogo } from '@phosphor-icons/react/dist/ssr'
 import { Logo } from '@/components/brand/Logo'
+import { seccionesPublicas } from '@/lib/domain/soporte'
 import type { Ajustes } from '@/lib/domain/types'
 import { enlaceWhatsapp } from '@/lib/domain/whatsapp'
 
 const usuario = (h: string) => h.replace(/^@/, '')
 
 export function Footer({ ajustes }: { ajustes: Ajustes }) {
+  const soporte = seccionesPublicas(ajustes.soporte)
   const redes = [
     { label: 'Instagram', href: `https://instagram.com/${usuario(ajustes.redes.instagram)}`, Icono: InstagramLogo },
     { label: 'TikTok', href: `https://tiktok.com/@${usuario(ajustes.redes.tiktok)}`, Icono: TiktokLogo },
@@ -15,7 +17,14 @@ export function Footer({ ajustes }: { ajustes: Ajustes }) {
   ]
   const columnas = [
     { titulo: 'Tienda', links: [['La vitrina', '/vitrina'], ['Tu dorsal', '/vitrina'], ['El drop', '/#drop'], ['Precios', '/#como-comprar']] },
-    { titulo: 'Ayuda', links: [['Cómo comprar', '/#como-comprar'], ['Guía de tallas', '/#como-comprar'], ['Envíos en El Oro', '/#como-comprar'], ['Escríbenos', redes[3].href]] },
+    {
+      titulo: 'Ayuda',
+      // Cada sección publicada en Admin → Soporte; mientras no haya ninguna, la ayuda básica del inicio.
+      links: [
+        ...(soporte.length ? soporte.map(s => [s.titulo, `/soporte#${s.id}`]) : [['Cómo comprar', '/#como-comprar']]),
+        ['Escríbenos', redes[3].href],
+      ],
+    },
   ]
 
   return (

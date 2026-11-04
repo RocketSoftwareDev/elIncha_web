@@ -31,7 +31,10 @@ interface EstadoCarrito {
 /** Misma prenda con la misma talla y personalización suma cantidad en vez de duplicarse. */
 function clave(l: Omit<LineaVista, 'key'>) {
   const p = l.personalizacion
-  return [l.productoId, l.comboId ?? '-', l.stockId ?? '-', l.talla, p.nombre, p.numero, p.numeroShort, [...p.parches].sort().join('+')].join('|')
+  return [
+    l.productoId, l.comboId ?? '-', l.stockId ?? '-', l.shortId ?? '-', l.tallaShort ?? '', l.talla,
+    p.nombre, p.numero, p.numeroShort, [...p.parches].sort().join('+'), p.sinSponsors ? 'sin' : 'con',
+  ].join('|')
 }
 
 export const useCarrito = create<EstadoCarrito>()(

@@ -1,10 +1,13 @@
 import { requerirAdmin } from '@/lib/auth/sesion'
 import type { Metadata } from 'next'
-import { Plus, Shield } from 'lucide-react'
+import { Pencil, Plus, Shield } from 'lucide-react'
 import { crearComboAccion, crearParcheAccion, guardarPreciosAccion } from '@/app/admin/acciones'
+import { CambiarImagen } from '@/components/admin/CambiarImagen'
 import { BotonEnviar, FormAccion } from '@/components/admin/FormAccion'
+import { FormShort, QuitarShort } from '@/components/admin/FormShort'
+import { FormTipo, QuitarTipo } from '@/components/admin/FormTipo'
 import { Card, CardHeader, PageHeader, boton, input } from '@/components/admin/ui'
-import { listarCombos, listarParches, listarTipos } from '@/lib/data/admin'
+import { listarCombos, listarParches, listarShorts, listarTipos, modoPrueba } from '@/lib/data/admin'
 import { MAX_NOMBRE } from '@/lib/domain/dorsal'
 import { formatoPrecio } from '@/lib/domain/pricing'
 import type { Combo, TipoPrenda } from '@/lib/domain/types'
@@ -30,7 +33,7 @@ function CampoPrecio({ name, valor, label }: { name: string; valor: number; labe
     <label className="flex w-24 items-center gap-1 rounded-lg border border-line-dark bg-admin-bg px-2.5 py-1.5 focus-within:border-navy-700 focus-within:bg-white">
       <span className="text-sm text-ink-soft">$</span>
       <span className="sr-only">{label}</span>
-      <input form={FORM} type="number" name={name} defaultValue={valor} min={0.5} step="0.5" required className="display w-full bg-transparent text-xl outline-none" />
+      <input form={FORM} name={name} defaultValue={valor.toFixed(2)} inputMode="decimal" pattern="\d{1,4}([.,]\d{1,2})?" required className="display w-full bg-transparent text-xl outline-none" />
     </label>
   )
 }
@@ -65,7 +68,8 @@ function TarjetaCombo({ combo, tipos }: { combo: Combo; tipos: TipoPrenda[] }) {
 export default async function PreciosPage() {
   // El layout no basta: Next genera la página en paralelo. Se verifica aquí también.
   await requerirAdmin()
-  const [tipos, combos, parches] = await Promise.all([listarTipos(), listarCombos(), listarParches()])
+  const [tipos, combos, parches, shorts] = await Promise.all([listarTipos(), listarCombos(), listarParches(), listarShorts()])
+  const prueba = modoPrueba()
 
   return (
     <>
@@ -78,29 +82,32 @@ export default async function PreciosPage() {
       <div className="grid gap-5 xl:grid-cols-[1fr_400px]">
         <div className="min-w-0 space-y-5">
           <Card className="overflow-hidden">
-            <CardHeader titulo="Tipos de prenda" subtitulo="El precio base de cada camiseta sale de aquí" />
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[620px] text-sm">
-                <thead className="bg-[#f8fafd] text-left">
-                  <tr className="kicker text-[10px] text-ink-soft">
-                    <th className="px-5 py-2.5 font-normal">Tipo</th>
-                    <th className="px-3 py-2.5 font-normal">Tallas</th>
-                    <th className="px-3 py-2.5 font-normal">Acepta nombre/núm.</th>
-                    <th className="px-5 py-2.5 font-normal">Precio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tipos.map(t => (
-                    <tr key={t.id} className="border-b border-line-dark last:border-0">
-                      <td className="px-5 py-2.5 font-semibold">{t.nombre}</td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-ink-soft">{t.tallas.join(' · ')}</td>
-                      <td className="px-3 py-2.5"><Interruptor name={`acepta_${t.id}`} checked={t.aceptaPersonalizacion} label={`${t.nombre} acepta nombre y número`} /></td>
-                      <td className="px-5 py-2.5"><CampoPrecio name={`precio_${t.id}`} valor={t.precio} label={`Precio de ${t.nombre}`} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <CardHeader titulo="Tipos de prenda" subtitulo="El precio base de cada camiseta sale de aquí. Precios con centavos: 43.99" />
+            <details className="border-b border-line-dark">
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 px-5 py-3 text-sm font-semibold"><Plus size={14} aria-hidden /> Nuevo tipo de prenda</summary>
+              <FormTipo />
+            </details>
+            <ul>
+              {tipos.map(t => (
+                <li key={t.id} className="border-b border-line-dark last:border-0">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-2.5 text-sm">
+                    <span className="min-w-40 flex-1 font-semibold">
+                      {t.nombre}
+                      {t.esShort && <span className="ml-2 rounded bg-sky-soft px-1.5 py-0.5 text-[10px] font-semibold text-navy-800">Short</span>}
+                    </span>
+                    <span className="w-44 font-mono text-xs text-ink-soft">{t.tallas.join(' · ')}</span>
+                    <Interruptor name={`acepta_${t.id}`} checked={t.aceptaPersonalizacion} label={`${t.nombre} acepta nombre y número`} />
+                    <CampoPrecio name={`precio_${t.id}`} valor={t.precio} label={`Precio de ${t.nombre}`} />
+                    <QuitarTipo id={t.id} nombre={t.nombre} />
+                  </div>
+                  <details className="px-5 pb-2.5">
+                    <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-navy-700"><Pencil size={12} aria-hidden /> Editar nombre y tallas</summary>
+                    <div className="mt-2"><FormTipo tipo={t} /></div>
+                  </details>
+                </li>
+              ))}
+            </ul>
+            <p className="bg-[#fff7ed] px-5 py-2.5 text-xs text-orange-900">Para quitar un tipo no debe tener camisetas ni estar en un combo.</p>
           </Card>
 
           <Card className="overflow-hidden">
@@ -112,7 +119,7 @@ export default async function PreciosPage() {
               <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold"><Plus size={14} aria-hidden /> Nuevo combo</summary>
               <FormAccion accion={crearComboAccion} className="mt-4 grid gap-3 sm:grid-cols-[1fr_120px]">
                 <input name="nombre" placeholder="Nombre del combo" aria-label="Nombre del combo" required className={input} />
-                <input name="precio" type="number" min={1} step="0.5" placeholder="Precio" aria-label="Precio del combo" required className={input} />
+                <input name="precio" inputMode="decimal" pattern="\d{1,4}([.,]\d{1,2})?" placeholder="55.00" aria-label="Precio del combo" required className={input} />
                 <fieldset className="flex flex-wrap gap-2 sm:col-span-2">
                   <legend className="kicker mb-2 text-[10px] text-ink-soft">Prendas del combo (mínimo dos)</legend>
                   {tipos.map(t => (
@@ -123,6 +130,37 @@ export default async function PreciosPage() {
                 </fieldset>
                 <BotonEnviar className={`${boton.oscuro} sm:col-span-2`}>Crear combo</BotonEnviar>
               </FormAccion>
+            </details>
+          </Card>
+
+          <Card className="overflow-hidden">
+            <CardHeader titulo="Pantalonetas que el cliente puede elegir" subtitulo="Al pedir un combo escoge una y su talla. El extra se suma al precio del combo." />
+            <ul>
+              {shorts.length === 0 && <li className="px-5 py-6 text-center text-sm text-ink-soft">Sin pantalonetas: el combo no se ofrece hasta que agregues una.</li>}
+              {shorts.map(s => (
+                <li key={s.id} className={`border-b border-line-dark px-5 py-4 ${s.activo ? '' : 'bg-[#f8fafd]'}`}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="flex-1 text-sm font-semibold">
+                      {s.nombre}
+                      {!s.activo && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Oculta</span>}
+                    </p>
+                    <span className="font-mono text-xs text-ink-soft">{s.tallas.join(' · ')}</span>
+                    <span className="display text-xl">{s.extra > 0 ? `+${formatoPrecio(s.extra)}` : 'Incluida'}</span>
+                  </div>
+                  <div className="mt-3"><CambiarImagen key={s.id + s.foto} destino="short" id={s.id} actual={s.foto} habilitada={!prueba} /></div>
+                  <details className="mt-2">
+                    <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-navy-700"><Pencil size={12} aria-hidden /> Editar</summary>
+                    <div className="mt-3 space-y-3 rounded-xl bg-[#f3f8fe] p-4">
+                      <FormShort short={s} />
+                      <QuitarShort id={s.id} nombre={s.nombre} />
+                    </div>
+                  </details>
+                </li>
+              ))}
+            </ul>
+            <details className="px-5 py-4">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold"><Plus size={14} aria-hidden /> Agregar pantaloneta</summary>
+              <div className="mt-4 rounded-xl bg-[#f3f8fe] p-4"><FormShort /></div>
             </details>
           </Card>
         </div>

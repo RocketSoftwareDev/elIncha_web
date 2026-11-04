@@ -6,7 +6,7 @@ import 'server-only'
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
-  Ajustes, Combo, Drop, Equipo, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, PedidoItem, Producto, Stock, TipoPrenda,
+  Ajustes, Combo, Drop, Equipo, EstadoDrop, EstadoPedido, Liga, Parche, Pedido, PedidoItem, Producto, ShortCombo, Stock, TipoPrenda,
 } from '@/lib/domain/types'
 import { ErrorNegocio, type EventoGuardado, type Repo } from './tipos'
 
@@ -57,6 +57,11 @@ const aProducto = (f: Fila): Producto => ({
   id: f.id as string, slug: f.slug as string, equipoId: f.equipo_id as string, tipoId: f.tipo_id as string, nombre: f.nombre as string,
   precioEspecial: f.precio_especial === null ? null : num(f.precio_especial), visible: f.visible as boolean, destacado: f.destacado as boolean,
   fotos: f.fotos as string[], parchesPermitidos: f.parches_permitidos as string[],
+  versionSinSponsors: (f.version_sin_sponsors as boolean) ?? false,
+})
+const aShort = (f: Fila): ShortCombo => ({
+  id: f.id as string, nombre: f.nombre as string, foto: f.foto as string, extra: num(f.extra), tallas: f.tallas as string[],
+  activo: f.activo as boolean, orden: f.orden as number,
 })
 const aStock = (f: Fila): Stock => ({ id: f.id as string, productoId: f.producto_id as string, talla: f.talla as string, cantidad: f.cantidad as number, precio: f.precio === null ? null : num(f.precio) })
 const aDrop = (f: Fila): Drop => ({
@@ -77,6 +82,7 @@ const deDrop = (d: Drop) => ({
 const deProducto = (p: Producto) => ({
   id: p.id, slug: p.slug, equipo_id: p.equipoId, tipo_id: p.tipoId, nombre: p.nombre, precio_especial: p.precioEspecial,
   visible: p.visible, destacado: p.destacado, fotos: p.fotos, parches_permitidos: p.parchesPermitidos,
+  version_sin_sponsors: p.versionSinSponsors,
 })
 
 export const repoSupabase: Repo = {
@@ -84,7 +90,7 @@ export const repoSupabase: Repo = {
 
   async catalogo() {
     const c = sb()
-    const [drops, ligas, equipos, tipos, parches, productos, combos, stock, ajustes] = await Promise.all([
+    const [drops, ligas, equipos, tipos, parches, productos, combos, stock, shorts, ajustes] = await Promise.all([
       c.from('drops').select('*').order('abre_en', { ascending: false }),
       c.from('ligas').select('*').order('orden'),
       c.from('equipos').select('*').order('orden'),
@@ -93,6 +99,7 @@ export const repoSupabase: Repo = {
       c.from('productos').select('*'),
       c.from('combos').select('*'),
       c.from('stock').select('*'),
+      c.from('shorts_combo').select('*').order('orden'),
       c.from('ajustes').select('datos').eq('id', 1).single(),
     ])
     return {
@@ -104,6 +111,7 @@ export const repoSupabase: Repo = {
       productos: datos(productos, 'productos').map(aProducto),
       combos: datos(combos, 'combos').map(aCombo),
       stock: datos(stock, 'stock').map(aStock),
+      shorts: datos(shorts, 'shorts').map(aShort),
       ajustes: datos(ajustes, 'ajustes').datos as Ajustes,
     }
   },
@@ -143,6 +151,12 @@ export const repoSupabase: Repo = {
   async guardarTipo(t) {
     ok(await sb().from('tipos_prenda').upsert({ id: t.id, nombre: t.nombre, precio: t.precio, tallas: t.tallas, acepta_personalizacion: t.aceptaPersonalizacion, es_short: t.esShort, orden: t.orden }), 'tipo')
   },
+  // La base rechaza borrar un tipo que todavía usan camisetas (FK sin cascada): admin.ts avisa antes.
+  async eliminarTipo(id) { ok(await sb().from('tipos_prenda').delete().eq('id', id), 'eliminar tipo') },
+  async guardarShort(s) {
+    ok(await sb().from('shorts_combo').upsert({ id: s.id, nombre: s.nombre, foto: s.foto, extra: s.extra, tallas: s.tallas, activo: s.activo, orden: s.orden }), 'short')
+  },
+  async eliminarShort(id) { ok(await sb().from('shorts_combo').delete().eq('id', id), 'eliminar short') },
   async guardarCombo(c) { ok(await sb().from('combos').upsert({ id: c.id, nombre: c.nombre, precio: c.precio, activo: c.activo, tipos: c.tipos }), 'combo') },
   async guardarParche(p) { ok(await sb().from('parches').upsert({ id: p.id, nombre: p.nombre, precio: p.precio, activo: p.activo }), 'parche') },
   async guardarAjustes(a) { ok(await sb().from('ajustes').upsert({ id: 1, datos: a }), 'ajustes') },

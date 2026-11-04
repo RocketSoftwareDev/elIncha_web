@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, X, Zap } from 'lucide-react'
 import { TarjetaProducto } from '@/components/tienda/TarjetaProducto'
 import { Buscador, FiltrosMovil, SelectorOrden } from '@/components/vitrina/Controles'
 import { Filtros } from '@/components/vitrina/Filtros'
@@ -22,6 +22,7 @@ export default async function Vitrina({ searchParams }: Props) {
   const [catalogo, ligas, listaTipos, equipos, drop] = await Promise.all([catalogoVisible(), ligasVisibles(), tipos(), equiposVisibles(), dropActual()])
   const r = buscar(catalogo, filtros)
   const abierto = aceptaPedidos(drop, ahora())
+  const conStock = catalogo.filter(p => p.stock.length > 0).length
 
   const chips = [
     ...filtros.ligas.map(s => ({ etiqueta: ligas.find(l => l.slug === s)?.nombre ?? s, href: urlVitrina(filtros, { ligas: alternar(filtros.ligas, s) }) })),
@@ -40,15 +41,27 @@ export default async function Vitrina({ searchParams }: Props) {
       <RegistrarBusquedaVacia termino={filtros.q} total={r.total} />
       <div className="border-b border-line px-4 pb-8 pt-8 md:px-[72px] md:pt-10">
         <div className="mx-auto max-w-[1296px] space-y-6">
-          <p className="kicker text-muted"><Link href="/" className="hover:text-white">Inicio</Link> / La vitrina</p>
+          <p className="kicker text-muted"><Link href="/" className="hover:text-white">Inicio</Link> / {filtros.inmediata ? 'Entrega inmediata' : 'La vitrina'}</p>
           <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-            <div className="space-y-2">
-              <h1 className="display text-[clamp(56px,7vw,88px)] leading-[0.95]">La vitrina</h1>
-              <p className="text-muted">
-                {catalogo.length} camisetas en {ligas.length} ligas
-                {abierto ? ` · ${drop!.nombre} cierra el ${fechaCorta(drop!.cierraEn)}` : ' · ahora mismo no hay drop abierto'}
-              </p>
-            </div>
+            {filtros.inmediata ? (
+              // Apartado de sobrantes: se venden tal cual llegan, sin drop y sin personalizar.
+              <div className="space-y-3">
+                <span className="kicker inline-flex items-center gap-1.5 bg-whatsapp px-2.5 py-1.5 text-[11px] font-bold text-navy-950"><Zap size={13} aria-hidden /> Listas para entregar</span>
+                <h1 className="display text-[clamp(56px,7vw,88px)] leading-[0.95]">Entrega inmediata</h1>
+                <p className="max-w-xl text-muted">
+                  {conStock} {conStock === 1 ? 'camiseta que ya está' : 'camisetas que ya están'} en Machala. Van tal cual llegan:
+                  sin nombre, número ni parches. No necesitas esperar un drop.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <h1 className="display text-[clamp(56px,7vw,88px)] leading-[0.95]">La vitrina</h1>
+                <p className="text-muted">
+                  {catalogo.length} camisetas en {ligas.length} ligas
+                  {abierto ? ` · ${drop!.nombre} cierra el ${fechaCorta(drop!.cierraEn)}` : ' · ahora mismo no hay drop abierto'}
+                </p>
+              </div>
+            )}
             <Buscador filtros={filtros} />
           </div>
         </div>
@@ -82,7 +95,7 @@ export default async function Vitrina({ searchParams }: Props) {
               </div>
             ) : (
               <ul className="grid grid-cols-2 gap-x-3 gap-y-8 md:gap-x-6 xl:grid-cols-3">
-                {r.productos.map(p => <TarjetaProducto key={p.id} producto={p} />)}
+                {r.productos.map(p => <TarjetaProducto key={p.id} producto={p} inmediata={filtros.inmediata} />)}
               </ul>
             )}
 
