@@ -13,34 +13,70 @@ export type Formato =
 const MARGEN_LOGO = 0.1
 
 export async function aWebp(archivo: File, formato: Formato, calidad = 0.85): Promise<Blob> {
-  const img = await createImageBitmap(archivo)
+  const img = await cargarImagen(archivo)
   const lienzo = document.createElement('canvas')
   const ctx = lienzo.getContext('2d')!
 
-  if (formato.tipo === 'logo') {
-    const recorte = recortarLogo(img)
-    lienzo.width = lienzo.height = formato.lado
-    const util = formato.lado * (1 - 2 * MARGEN_LOGO)
-    const escala = util / Math.max(recorte.width, recorte.height)
-    const w = recorte.width * escala, h = recorte.height * escala
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(recorte, (formato.lado - w) / 2, (formato.lado - h) / 2, w, h)
-  } else if (formato.tipo === 'cuadrado') {
-    const lado = Math.min(img.width, img.height)
-    lienzo.width = lienzo.height = Math.min(formato.lado, lado)
-    ctx.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, lienzo.width, lienzo.height)
-  } else {
-    const max = formato.tipo === 'ancho' ? formato.ancho / img.width : Math.min(formato.lado / img.width, formato.lado / img.height)
-    const escala = Math.min(1, max)
-    lienzo.width = Math.round(img.width * escala)
-    lienzo.height = Math.round(img.height * escala)
-    ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height)
+  try {
+    if (formato.tipo === 'logo') {
+      const recorte = recortarLogo(img)
+      lienzo.width = lienzo.height = formato.lado
+      const util = formato.lado * (1 - 2 * MARGEN_LOGO)
+      const escala = util / Math.max(recorte.width, recorte.height)
+      const w = recorte.width * escala, h = recorte.height * escala
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(recorte, (formato.lado - w) / 2, (formato.lado - h) / 2, w, h)
+    } else if (formato.tipo === 'cuadrado') {
+      const lado = Math.min(img.width, img.height)
+      lienzo.width = lienzo.height = Math.min(formato.lado, lado)
+      ctx.drawImage(img.fuente, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, lienzo.width, lienzo.height)
+    } else {
+      const max = formato.tipo === 'ancho' ? formato.ancho / img.width : Math.min(formato.lado / img.width, formato.lado / img.height)
+      const escala = Math.min(1, max)
+      lienzo.width = Math.round(img.width * escala)
+      lienzo.height = Math.round(img.height * escala)
+      ctx.drawImage(img.fuente, 0, 0, lienzo.width, lienzo.height)
+    }
+  } finally {
+    img.liberar()
   }
-  img.close()
 
   const blob = await new Promise<Blob | null>(r => lienzo.toBlob(r, 'image/webp', calidad))
-  if (!blob || blob.type !== 'image/webp') throw new Error('Este navegador no puede convertir la imagen. Usa Chrome o un celular actualizado.')
+  if (!blob || blob.type !== 'image/webp') throw new Error('Este celular no pudo preparar la imagen. Prueba con una foto JPG, PNG o WebP.')
   return blob
+}
+
+interface ImagenCargada {
+  fuente: CanvasImageSource
+  width: number
+  height: number
+  liberar: () => void
+}
+
+/** Safari/iPhone no siempre ofrece createImageBitmap, aunque sí pueda abrir la foto. */
+async function cargarImagen(archivo: File): Promise<ImagenCargada> {
+  if ('createImageBitmap' in globalThis) {
+    try {
+      const bitmap = await createImageBitmap(archivo)
+      return { fuente: bitmap, width: bitmap.width, height: bitmap.height, liberar: () => bitmap.close() }
+    } catch {
+      // El elemento <img> de Safari puede decodificar formatos que createImageBitmap rechaza.
+    }
+  }
+
+  const url = URL.createObjectURL(archivo)
+  const imagen = new Image()
+  try {
+    imagen.src = url
+    await new Promise<void>((resolve, reject) => {
+      imagen.onload = () => resolve()
+      imagen.onerror = () => reject(new Error('Este celular no puede leer el formato de la foto. Prueba con JPG, PNG o WebP.'))
+    })
+    return { fuente: imagen, width: imagen.naturalWidth, height: imagen.naturalHeight, liberar: () => URL.revokeObjectURL(url) }
+  } catch (error) {
+    URL.revokeObjectURL(url)
+    throw error
+  }
 }
 
 /**
@@ -48,14 +84,14 @@ export async function aWebp(archivo: File, formato: Formato, calidad = 0.85): Pr
  * JPG), lo vuelve transparente desde los bordes hacia adentro (sin tocar los blancos
  * DENTRO del escudo) y luego corta todo el espacio vacío alrededor.
  */
-function recortarLogo(img: ImageBitmap): HTMLCanvasElement {
+function recortarLogo(img: ImagenCargada): HTMLCanvasElement {
   const escala = Math.min(1, 800 / Math.max(img.width, img.height))
   const W = Math.max(1, Math.round(img.width * escala)), H = Math.max(1, Math.round(img.height * escala))
   const c = document.createElement('canvas')
   c.width = W
   c.height = H
   const ctx = c.getContext('2d', { willReadFrequently: true })!
-  ctx.drawImage(img, 0, 0, W, H)
+  ctx.drawImage(img.fuente, 0, 0, W, H)
   const datos = ctx.getImageData(0, 0, W, H)
   const px = datos.data
 

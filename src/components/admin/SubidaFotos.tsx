@@ -101,14 +101,24 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
           </div>
         ))}
         {Array.from({ length: quedan }, (_, k) => (
-          <button key={`vacio-${k}`} type="button" disabled={!puedeSubir || pendiente} onClick={() => entrada.current?.click()}
-            className="flex h-[132px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/20 text-ink-soft hover:border-navy-950/50 disabled:opacity-50">
-            {pendiente && k === 0 ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <ImagePlus size={20} aria-hidden />}
-            <span className="text-xs">{pendiente && k === 0 ? 'Subiendo…' : k === 0 ? 'Agregar' : `Quedan ${quedan}`}</span>
-          </button>
+          k === 0 ? (
+            <label key="agregar" aria-disabled={!puedeSubir || pendiente}
+              className="relative flex h-[132px] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed border-navy-950/20 text-ink-soft hover:border-navy-950/50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+              {pendiente ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <ImagePlus size={20} aria-hidden />}
+              <span className="text-xs">{pendiente ? 'Subiendo…' : 'Agregar fotos'}</span>
+              <input ref={entrada} type="file" multiple accept="image/*,.heic,.heif" disabled={!puedeSubir || pendiente}
+                className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" aria-label="Elegir fotos de la galería"
+                onChange={e => subir(e.target.files)} />
+            </label>
+          ) : (
+            <div key={`vacio-${k}`} aria-hidden
+              className="flex h-[132px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/10 text-ink-soft/60">
+              <ImagePlus size={20} aria-hidden />
+              <span className="text-xs">Espacio {fotos.length + k + 1}</span>
+            </div>
+          )
         ))}
       </div>
-      <input ref={entrada} type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic" className="hidden" onChange={e => subir(e.target.files)} />
       {mensaje?.error && <p role="alert" className="text-xs text-red-700">{mensaje.error}</p>}
       {mensaje?.ok && <p className="text-xs text-green-700">{mensaje.ok}</p>}
       <p className="text-xs text-ink-soft">
