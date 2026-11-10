@@ -108,23 +108,34 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
           </div>
         ))}
       </div>
-      <div className={`rounded-xl border border-line-dark bg-sky-soft p-3 ${!puedeSubir || pendiente ? 'opacity-60' : ''}`}>
-        <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-navy-950">
-          {pendiente ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <ImagePlus size={16} aria-hidden />}
-          {pendiente ? 'Subiendo fotos…' : 'Seleccionar fotos del celular'}
-        </p>
-        {/* Visible a propósito: el control nativo es el más fiable en Safari, Chrome y navegadores internos. */}
-        <input ref={entrada} type="file" multiple accept="image/*,.heic,.heif" disabled={!puedeSubir || pendiente}
-          className="block w-full cursor-pointer rounded-lg border border-navy-950/15 bg-white text-sm text-ink-soft file:mr-3 file:cursor-pointer file:border-0 file:bg-navy-950 file:px-3 file:py-2.5 file:font-semibold file:text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:file:cursor-not-allowed"
-          aria-label="Seleccionar fotos del celular" onChange={e => subir(e.target.files)} />
-      </div>
+      {!productoId ? (
+        <div className="rounded-xl border border-sky/40 bg-sky-soft p-3">
+          <p className="text-sm font-semibold text-navy-950">Primero guarda los datos de la camiseta</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">Al continuar volverás directamente a esta camiseta con el selector de fotos habilitado.</p>
+          <button type="submit" name="modo" value="borrador"
+            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-navy-950 px-4 py-3 text-sm font-semibold text-white">
+            <ImagePlus size={16} className="text-sky" aria-hidden /> Guardar y continuar con las fotos
+          </button>
+        </div>
+      ) : (
+        <div className={`rounded-xl border border-line-dark bg-sky-soft p-3 ${!puedeSubir || pendiente ? 'opacity-60' : ''}`}>
+          <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-navy-950">
+            {pendiente ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <ImagePlus size={16} aria-hidden />}
+            {pendiente ? 'Subiendo fotos…' : 'Seleccionar fotos del celular'}
+          </p>
+          {/* Visible a propósito: el control nativo es el más fiable en Safari, Chrome y navegadores internos. */}
+          <input ref={entrada} type="file" multiple accept="image/*,.heic,.heif" disabled={!puedeSubir || pendiente}
+            className="block w-full cursor-pointer rounded-lg border border-navy-950/15 bg-white text-sm text-ink-soft file:mr-3 file:cursor-pointer file:border-0 file:bg-navy-950 file:px-3 file:py-2.5 file:font-semibold file:text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:file:cursor-not-allowed"
+            aria-label="Seleccionar fotos del celular" onChange={e => subir(e.target.files)} />
+        </div>
+      )}
       {mensaje?.error && <p role="alert" className="text-xs text-red-700">{mensaje.error}</p>}
       {mensaje?.ok && <p className="text-xs text-green-700">{mensaje.ok}</p>}
       <p className="text-xs text-ink-soft">
         {!habilitada
           ? 'En modo de prueba no se suben fotos: se habilita al configurar Supabase.'
           : !productoId
-            ? 'Guarda la camiseta primero; después podrás subir sus fotos.'
+            ? 'Completa los campos obligatorios y toca «Guardar y continuar con las fotos».'
             : `Máximo ${MAX_FOTOS} fotos (puedes elegir varias a la vez). Ordénalas con las flechas: la 1 es la portada. Toca una para ver cómo la verá el cliente.`}
       </p>
 
