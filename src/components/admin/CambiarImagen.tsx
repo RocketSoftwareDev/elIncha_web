@@ -65,14 +65,16 @@ export function CambiarImagen({ destino, id, actual, habilitada }: Props) {
           : <Shield size={24} className="text-navy-800" aria-hidden />}
       </span>
       <div className="flex flex-wrap gap-2">
-        <label aria-disabled={!habilitada || pendiente}
-          className="relative inline-flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border border-navy-950/15 bg-white px-3 py-2 text-sm font-semibold text-navy-950 hover:bg-admin-bg has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-          {pendiente ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <ImagePlus size={14} aria-hidden />}
-          {pendiente ? 'Subiendo…' : destino === 'short' ? (actual ? 'Cambiar foto' : 'Subir foto') : esLiga ? 'Cambiar imagen' : actual ? 'Cambiar escudo' : 'Subir escudo'}
+        <div className={`rounded-lg border border-navy-950/15 bg-white p-2 ${!habilitada || pendiente ? 'opacity-60' : ''}`}>
+          <p className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-navy-950">
+            {pendiente ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+            {pendiente ? 'Subiendo…' : destino === 'short' ? (actual ? 'Cambiar foto' : 'Subir foto') : esLiga ? 'Cambiar imagen' : actual ? 'Cambiar escudo' : 'Subir escudo'}
+          </p>
+          {/* Se mantiene visible para que el navegador móvil abra directamente su selector nativo. */}
           <input ref={entrada} type="file" accept="image/*,.heic,.heif" disabled={!habilitada || pendiente}
-            className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" aria-label="Elegir imagen de la galería"
+            className="block max-w-[280px] cursor-pointer text-xs text-ink-soft file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-navy-950 file:px-2.5 file:py-2 file:font-semibold file:text-white disabled:cursor-not-allowed disabled:file:cursor-not-allowed" aria-label="Elegir imagen de la galería"
             onChange={e => subir(e.target.files)} />
-        </label>
+        </div>
         {destino === 'equipo' && actual && habilitada && (
           <button type="button" onClick={quitar} disabled={pendiente} aria-label="Quitar escudo"
             className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-ink-soft hover:text-red-700 disabled:opacity-50">
