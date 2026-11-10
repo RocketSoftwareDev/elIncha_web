@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight, Crop, ImagePlus, Loader2, Maximize2, X } from 'lucide-react'
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { moverFotoAccion, quitarFotoAccion, subirFotoAccion } from '@/app/admin/acciones'
 import { Precio } from '@/components/Precio'
 import { aWebp } from '@/lib/imagen-cliente'
@@ -13,23 +13,47 @@ interface Props {
   productoId: string | null
   fotos: string[]
   habilitada: boolean
+  /** En una camiseta nueva las fotos quedan listas y el formulario las sube después de crearla. */
+  onPendientes?: (archivos: File[]) => void
   /** Para la vista previa: cómo se verá en la tienda. */
   muestra: { titulo: string; liga: string; precio: number }
 }
 
-export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
+interface FotoPendiente { archivo: File; url: string }
+
+export function SubidaFotos({ productoId, fotos, habilitada, onPendientes, muestra }: Props) {
   const entrada = useRef<HTMLInputElement>(null)
+  const urlsTemporales = useRef<string[]>([])
   const [pendiente, iniciar] = useTransition()
   const [mensaje, setMensaje] = useState<{ ok?: string; error?: string } | null>(null)
   const [elegida, setElegida] = useState(0)
-  const quedan = MAX_FOTOS - fotos.length
-  const puedeSubir = habilitada && !!productoId && quedan > 0
-  const actual = fotos[Math.min(elegida, fotos.length - 1)]
+  const [fotosPendientes, setFotosPendientes] = useState<FotoPendiente[]>([])
+  const fotosVista = [...fotos, ...fotosPendientes.map(f => f.url)]
+  const quedan = MAX_FOTOS - fotosVista.length
+  const puedeSubir = habilitada && quedan > 0
+  const actual = fotosVista[Math.min(elegida, fotosVista.length - 1)]
+
+  useEffect(() => () => {
+    for (const url of urlsTemporales.current) URL.revokeObjectURL(url)
+  }, [])
 
   function subir(archivos: FileList | null) {
-    if (!archivos?.length || !productoId) return
+    if (!archivos?.length) return
     const lista = [...archivos].slice(0, quedan)
     setMensaje(null)
+
+    if (!productoId) {
+      for (const url of urlsTemporales.current) URL.revokeObjectURL(url)
+      const nuevas = lista.map(archivo => ({ archivo, url: URL.createObjectURL(archivo) }))
+      urlsTemporales.current = nuevas.map(f => f.url)
+      setFotosPendientes(nuevas)
+      onPendientes?.(nuevas.map(f => f.archivo))
+      setElegida(0)
+      setMensaje({ ok: nuevas.length === 1 ? 'Foto lista para subir al guardar' : `${nuevas.length} fotos listas para subir al guardar` })
+      if (entrada.current) entrada.current.value = ''
+      return
+    }
+
     iniciar(async () => {
       try {
         for (const archivo of lista) {
@@ -47,6 +71,31 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
         if (entrada.current) entrada.current.value = ''
       }
     })
+  }
+
+  function quitarPendiente(indice: number) {
+    setFotosPendientes(actuales => {
+      const foto = actuales[indice]
+      if (foto) {
+        URL.revokeObjectURL(foto.url)
+        urlsTemporales.current = urlsTemporales.current.filter(url => url !== foto.url)
+      }
+      const nuevas = actuales.filter((_, i) => i !== indice)
+      onPendientes?.(nuevas.map(f => f.archivo))
+      return nuevas
+    })
+    setElegida(0)
+  }
+
+  function moverPendiente(desde: number, destino: number) {
+    setFotosPendientes(actuales => {
+      const nuevas = [...actuales]
+      const [foto] = nuevas.splice(desde, 1)
+      if (foto) nuevas.splice(destino, 0, foto)
+      onPendientes?.(nuevas.map(f => f.archivo))
+      return nuevas
+    })
+    setElegida(destino)
   }
 
   function quitar(url: string) {
@@ -72,12 +121,15 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
     })
   }
 
-  const editable = habilitada && !!productoId
+  const editable = habilitada && (!!productoId || fotosPendientes.length > 0)
 
   return (
     <>
       <div className="grid grid-cols-3 gap-2.5">
-        {fotos.map((url, i) => (
+        {fotosVista.map((url, i) => {
+          const esPendiente = i >= fotos.length
+          const indicePendiente = i - fotos.length
+          return (
           <div key={url} className={`group relative h-[132px] overflow-hidden rounded-lg bg-[#e3ecf8] ${i === elegida ? 'ring-2 ring-navy-950' : 'ring-1 ring-line-dark'}`}>
             <button type="button" onClick={() => setElegida(i)} aria-label={`Ver cómo se ve la foto ${i + 1}`} className="absolute inset-0">
               <Image src={url} alt="" fill sizes="130px" className="object-cover" />
@@ -85,26 +137,27 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
             {i === 0 && <span className="kicker pointer-events-none absolute left-1.5 top-1.5 rounded bg-navy-950 px-1.5 py-0.5 text-[9px] text-sky">Portada</span>}
             {editable && (
               <>
-                <button type="button" onClick={() => quitar(url)} aria-label={`Quitar foto ${i + 1}`}
+                <button type="button" onClick={() => esPendiente ? quitarPendiente(indicePendiente) : quitar(url)} aria-label={`Quitar foto ${i + 1}`}
                   className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-white/90 text-navy-950 shadow">
                   <X size={13} />
                 </button>
                 <span className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-between">
-                  <button type="button" disabled={i === 0 || pendiente} onClick={() => mover(url, i - 1)} aria-label={`Mover foto ${i + 1} antes`}
+                  <button type="button" disabled={i === 0 || pendiente} onClick={() => esPendiente ? moverPendiente(indicePendiente, indicePendiente - 1) : mover(url, i - 1)} aria-label={`Mover foto ${i + 1} antes`}
                     className="grid size-6 place-items-center rounded-full bg-white/90 text-navy-950 shadow disabled:opacity-0"><ChevronLeft size={14} /></button>
                   <span className="rounded bg-white/90 px-1.5 text-[11px] font-bold text-navy-950">{i + 1}</span>
-                  <button type="button" disabled={i === fotos.length - 1 || pendiente} onClick={() => mover(url, i + 1)} aria-label={`Mover foto ${i + 1} después`}
+                  <button type="button" disabled={i === fotosVista.length - 1 || pendiente} onClick={() => esPendiente ? moverPendiente(indicePendiente, indicePendiente + 1) : mover(url, i + 1)} aria-label={`Mover foto ${i + 1} después`}
                     className="grid size-6 place-items-center rounded-full bg-white/90 text-navy-950 shadow disabled:opacity-0"><ChevronRight size={14} /></button>
                 </span>
               </>
             )}
           </div>
-        ))}
+          )
+        })}
         {Array.from({ length: quedan }, (_, k) => (
           <div key={`vacio-${k}`} aria-hidden
             className="flex h-[132px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/10 text-ink-soft/60">
             <ImagePlus size={20} aria-hidden />
-            <span className="text-xs">Espacio {fotos.length + k + 1}</span>
+            <span className="text-xs">Espacio {fotosVista.length + k + 1}</span>
           </div>
         ))}
       </div>
@@ -124,11 +177,11 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
         {!habilitada
           ? 'En modo de prueba no se suben fotos: se habilita al configurar Supabase.'
           : !productoId
-            ? 'Guarda la camiseta primero; después podrás subir sus fotos.'
+            ? `Elige hasta ${MAX_FOTOS} fotos. Se subirán automáticamente después de crear la camiseta.`
             : `Máximo ${MAX_FOTOS} fotos (puedes elegir varias a la vez). Ordénalas con las flechas: la 1 es la portada. Toca una para ver cómo la verá el cliente.`}
       </p>
 
-      {actual && <VistaPrevia foto={actual} portada={fotos[0]} indice={Math.min(elegida, fotos.length - 1)} total={fotos.length} {...muestra} />}
+      {actual && <VistaPrevia foto={actual} portada={fotosVista[0]} indice={Math.min(elegida, fotosVista.length - 1)} total={fotosVista.length} {...muestra} />}
     </>
   )
 }

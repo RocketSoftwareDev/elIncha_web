@@ -110,38 +110,55 @@ const productoSchema = z.object({
   precioEspecial: z.union([z.literal(''), dinero.refine(n => n > 0, 'El precio especial debe ser mayor a 0')]),
 })
 
+async function guardarProducto(f: FormData) {
+  const eraNueva = !f.get('id')
+  const d = productoSchema.parse({
+    id: f.get('id') || undefined,
+    equipoId: f.get('equipoId') ?? '',
+    tipoId: f.get('tipoId') ?? '',
+    nombre: f.get('nombre') ?? '',
+    precioEspecial: f.get('precioEspecial') ?? '',
+  })
+  const existente = d.id ? await admin.productoPorId(d.id) : null
+  const guardado = await admin.guardarProducto({
+    id: d.id,
+    equipoId: d.equipoId,
+    tipoId: d.tipoId,
+    nombre: d.nombre,
+    precioEspecial: d.precioEspecial === '' ? null : d.precioEspecial,
+    // «Guardar borrador» la deja oculta aunque el interruptor esté prendido.
+    visible: f.get('modo') !== 'borrador' && marcado(f, 'visible'),
+    destacado: marcado(f, 'destacado'),
+    fotos: existente?.fotos ?? [],
+    parchesPermitidos: f.getAll('parches').map(String),
+    versionSinSponsors: marcado(f, 'versionSinSponsors'),
+  })
+  return { guardado, eraNueva }
+}
+
 export async function guardarProductoAccion(_: Resultado, f: FormData): Promise<Resultado> {
   await requerirAdmin()
-  let guardado: { id: string } | null = null
-  const eraNueva = !f.get('id')
+  let resultado: Awaited<ReturnType<typeof guardarProducto>> | null = null
   try {
-    const d = productoSchema.parse({
-      id: f.get('id') || undefined,
-      equipoId: f.get('equipoId') ?? '',
-      tipoId: f.get('tipoId') ?? '',
-      nombre: f.get('nombre') ?? '',
-      precioEspecial: f.get('precioEspecial') ?? '',
-    })
-    const existente = d.id ? await admin.productoPorId(d.id) : null
-    guardado = await admin.guardarProducto({
-      id: d.id,
-      equipoId: d.equipoId,
-      tipoId: d.tipoId,
-      nombre: d.nombre,
-      precioEspecial: d.precioEspecial === '' ? null : d.precioEspecial,
-      // «Guardar borrador» la deja oculta aunque el interruptor esté prendido.
-      visible: f.get('modo') !== 'borrador' && marcado(f, 'visible'),
-      destacado: marcado(f, 'destacado'),
-      fotos: existente?.fotos ?? [],
-      parchesPermitidos: f.getAll('parches').map(String),
-      versionSinSponsors: marcado(f, 'versionSinSponsors'),
-    })
+    resultado = await guardarProducto(f)
   } catch (e) {
     return { error: errorDe(e) }
   }
   refrescar()
   // Una camiseta nueva queda abierta para subirle las fotos enseguida.
-  redirect(eraNueva && guardado ? `/admin/productos/${guardado.id}` : '/admin/productos')
+  redirect(resultado.eraNueva ? `/admin/productos/${resultado.guardado.id}` : '/admin/productos')
+}
+
+/** Guarda sin redirigir: el cliente necesita el ID para subir las fotos elegidas al crear. */
+export async function guardarProductoParaFotosAccion(f: FormData): Promise<{ id?: string; error?: string }> {
+  await requerirAdmin()
+  try {
+    const { guardado } = await guardarProducto(f)
+    refrescar()
+    return { id: guardado.id }
+  } catch (e) {
+    return { error: errorDe(e) }
+  }
 }
 
 export async function alternarVisibleAccion(f: FormData) {

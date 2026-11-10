@@ -2,9 +2,11 @@
 
 import { ArrowLeft, Check, Lock, Plus, Send } from 'lucide-react'
 import Link from 'next/link'
-import { useActionState, useState } from 'react'
-import { guardarProductoAccion } from '@/app/admin/acciones'
+import { useRouter } from 'next/navigation'
+import { useActionState, useState, type FormEvent } from 'react'
+import { guardarProductoAccion, guardarProductoParaFotosAccion, subirFotoAccion } from '@/app/admin/acciones'
 import { formatoPrecio } from '@/lib/domain/pricing'
+import { aWebp } from '@/lib/imagen-cliente'
 import type { Equipo, Liga, Parche, Producto, TipoPrenda } from '@/lib/domain/types'
 import { SelectBuscable } from './SelectBuscable'
 import { SubidaFotos } from './SubidaFotos'
@@ -23,7 +25,11 @@ interface Props {
 const tarjeta = 'space-y-4 rounded-2xl border border-line-dark bg-white p-5'
 
 export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFotos }: Props) {
+  const router = useRouter()
   const [estado, enviar, pendiente] = useActionState(guardarProductoAccion, null)
+  const [fotosPendientes, setFotosPendientes] = useState<File[]>([])
+  const [guardandoConFotos, setGuardandoConFotos] = useState(false)
+  const [errorFotos, setErrorFotos] = useState<string | null>(null)
 
   const equipoInicial = equipos.find(e => e.id === producto?.equipoId)
   const [ligaId, setLigaId] = useState(equipoInicial?.ligaId ?? ligas[0]?.id ?? '')
@@ -43,8 +49,47 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
 
   const alternar = (id: string) => setElegidos(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]))
 
+  async function enviarConFotos(e: FormEvent<HTMLFormElement>) {
+    if (producto || fotosPendientes.length === 0) return
+    e.preventDefault()
+    setErrorFotos(null)
+    setGuardandoConFotos(true)
+
+    const datos = new FormData(e.currentTarget)
+    const boton = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    datos.set('modo', boton?.value === 'publicar' ? 'publicar' : 'borrador')
+
+    try {
+      const guardado = await guardarProductoParaFotosAccion(datos)
+      if (!guardado.id) {
+        setErrorFotos(guardado.error ?? 'No se pudo crear la camiseta')
+        return
+      }
+
+      for (const archivo of fotosPendientes) {
+        const foto = new FormData()
+        foto.set('productoId', guardado.id)
+        foto.set('foto', await aWebp(archivo, { tipo: 'ancho', ancho: 1200 }, 0.82), 'foto.webp')
+        const subida = await subirFotoAccion(null, foto)
+        if (subida?.error) {
+          router.replace(`/admin/productos/${guardado.id}`)
+          return
+        }
+      }
+
+      router.replace(`/admin/productos/${guardado.id}`)
+      router.refresh()
+    } catch (error) {
+      setErrorFotos(error instanceof Error ? error.message : 'No se pudo guardar la camiseta con sus fotos')
+    } finally {
+      setGuardandoConFotos(false)
+    }
+  }
+
+  const guardando = pendiente || guardandoConFotos
+
   return (
-    <form action={enviar} className="space-y-5">
+    <form action={fotosPendientes.length > 0 ? undefined : enviar} onSubmit={enviarConFotos} className="space-y-5">
       {producto && <input type="hidden" name="id" value={producto.id} />}
       <input type="hidden" name="tipoId" value={tipoId} />
       {elegidos.map(id => <input key={id} type="hidden" name="parches" value={id} />)}
@@ -57,16 +102,17 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
           <h1 className="display text-[40px] text-navy-950">{producto ? 'Editar camiseta' : 'Nueva camiseta'}</h1>
         </div>
         <div className="flex gap-2.5">
-          <button type="submit" name="modo" value="borrador" disabled={pendiente} className="rounded-lg border border-navy-950/15 bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50">
-            Guardar borrador
+          <button type="submit" name="modo" value="borrador" disabled={guardando} className="rounded-lg border border-navy-950/15 bg-white px-4 py-2.5 text-sm font-semibold disabled:opacity-50">
+            {guardandoConFotos ? 'Guardando fotos…' : 'Guardar borrador'}
           </button>
-          <button type="submit" name="modo" value="publicar" disabled={pendiente} className="inline-flex items-center gap-2 rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-            <Send size={15} className="text-sky" aria-hidden /> {pendiente ? 'Guardando…' : 'Publicar en la vitrina'}
+          <button type="submit" name="modo" value="publicar" disabled={guardando} className="inline-flex items-center gap-2 rounded-lg bg-navy-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+            <Send size={15} className="text-sky" aria-hidden /> {guardando ? 'Guardando…' : 'Publicar en la vitrina'}
           </button>
         </div>
       </header>
 
       {estado?.error && <Aviso tipo="error">{estado.error}</Aviso>}
+      {errorFotos && <Aviso tipo="error">{errorFotos}</Aviso>}
 
       <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
         <div className="min-w-0 space-y-5">
@@ -157,6 +203,7 @@ export function FormProducto({ ligas, equipos, tipos, parches, producto, subirFo
               <span className="kicker text-[10px] text-ink-soft">{producto?.fotos.length ?? 0} / 6</span>
             </div>
             <SubidaFotos productoId={producto?.id ?? null} fotos={producto?.fotos ?? []} habilitada={subirFotos}
+              onPendientes={producto ? undefined : setFotosPendientes}
               muestra={{ titulo: `${equipo?.nombre ?? ''} ${nombre}`.trim() || 'Camiseta', liga: liga?.nombre ?? '', precio }} />
           </section>
 
