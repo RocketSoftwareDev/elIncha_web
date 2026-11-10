@@ -5,6 +5,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import sharp from 'sharp'
 import { z } from 'zod'
 import { inputAIso } from '@/components/admin/fechas'
 import { requerirAdmin } from '@/lib/auth/sesion'
@@ -171,10 +172,25 @@ export async function alternarVisibleAccion(f: FormData) {
 
 const MAX_FOTO = 1_500_000 // el navegador ya la reduce a 1200 px en WebP
 
-/** Revisa el contenido real del archivo (RIFF....WEBP), no lo que diga el navegador. */
-function esWebp(b: Uint8Array) {
+/** Revisa las firmas reales; nunca confía en la extensión ni en el MIME del navegador. */
+function tipoImagen(b: Uint8Array): 'webp' | 'jpeg' | 'png' | null {
   const t = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n))
-  return b.length > 12 && t(0, 4) === 'RIFF' && t(8, 4) === 'WEBP'
+  if (b.length > 12 && t(0, 4) === 'RIFF' && t(8, 4) === 'WEBP') return 'webp'
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpeg'
+  if (b.length > 8 && b[0] === 0x89 && t(1, 3) === 'PNG' && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'png'
+  return null
+}
+
+/** Safari de algunos iPhone no exporta WebP: el servidor normaliza su JPEG/PNG. */
+async function normalizarWebp(datos: Uint8Array): Promise<Uint8Array> {
+  const tipo = tipoImagen(datos)
+  if (tipo === 'webp') return datos
+  if (!tipo) throw new ErrorNegocio('Formato no válido. Elige una foto JPG, PNG, WebP o HEIC desde Fotos.')
+  try {
+    return new Uint8Array(await sharp(datos).rotate().webp({ quality: 85 }).toBuffer())
+  } catch {
+    throw new ErrorNegocio('No se pudo leer la imagen. Intenta elegir otra foto desde la galería.')
+  }
 }
 
 export async function subirFotoAccion(_: Resultado, f: FormData): Promise<Resultado> {
@@ -184,8 +200,7 @@ export async function subirFotoAccion(_: Resultado, f: FormData): Promise<Result
     const archivo = f.get('foto')
     if (!(archivo instanceof Blob) || archivo.size === 0) throw new ErrorNegocio('Elige una foto')
     if (archivo.size > MAX_FOTO) throw new ErrorNegocio('La foto pesa demasiado (máx. 1,5 MB)')
-    const datos = new Uint8Array(await archivo.arrayBuffer())
-    if (!esWebp(datos)) throw new ErrorNegocio('Formato no válido')
+    const datos = await normalizarWebp(new Uint8Array(await archivo.arrayBuffer()))
     await admin.agregarFoto(productoId, datos)
   } catch (e) {
     return { error: errorDe(e) }
@@ -203,8 +218,7 @@ export async function subirImagenAccion(_: Resultado, f: FormData): Promise<Resu
     const archivo = f.get('imagen')
     if (!(archivo instanceof Blob) || archivo.size === 0) throw new ErrorNegocio('Elige una imagen')
     if (archivo.size > 600_000) throw new ErrorNegocio('La imagen pesa demasiado')
-    const datos = new Uint8Array(await archivo.arrayBuffer())
-    if (!esWebp(datos)) throw new ErrorNegocio('Formato no válido')
+    const datos = await normalizarWebp(new Uint8Array(await archivo.arrayBuffer()))
     if (destino === 'liga') await admin.cambiarImagenLiga(id, datos)
     else if (destino === 'short') await admin.cambiarFotoShort(id, datos)
     else await admin.cambiarEscudo(id, datos)

@@ -41,9 +41,19 @@ export async function aWebp(archivo: File, formato: Formato, calidad = 0.85): Pr
     img.liberar()
   }
 
-  const blob = await new Promise<Blob | null>(r => lienzo.toBlob(r, 'image/webp', calidad))
-  if (!blob || blob.type !== 'image/webp') throw new Error('Este celular no pudo preparar la imagen. Prueba con una foto JPG, PNG o WebP.')
-  return blob
+  const webp = await convertirLienzo(lienzo, 'image/webp', calidad)
+  if (webp?.type === 'image/webp') return webp
+
+  // Algunos iPhone pueden abrir HEIC/JPG, pero su Safari no exporta canvas a WebP.
+  // Se envía un formato que sí soporte y el servidor lo convierte a WebP antes de guardarlo.
+  const tipoRespaldo = formato.tipo === 'logo' ? 'image/png' : 'image/jpeg'
+  const respaldo = await convertirLienzo(lienzo, tipoRespaldo, calidad)
+  if (!respaldo) throw new Error('Este celular no pudo preparar la imagen. Intenta elegirla desde Fotos o usa JPG/PNG.')
+  return respaldo
+}
+
+function convertirLienzo(lienzo: HTMLCanvasElement, tipo: string, calidad: number) {
+  return new Promise<Blob | null>(resolve => lienzo.toBlob(resolve, tipo, calidad))
 }
 
 interface ImagenCargada {
