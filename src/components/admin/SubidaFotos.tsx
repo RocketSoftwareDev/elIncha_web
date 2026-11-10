@@ -101,23 +101,22 @@ export function SubidaFotos({ productoId, fotos, habilitada, muestra }: Props) {
           </div>
         ))}
         {Array.from({ length: quedan }, (_, k) => (
-          k === 0 ? (
-            <label key="agregar" aria-disabled={!puedeSubir || pendiente}
-              className="relative flex h-[132px] cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-lg border border-dashed border-navy-950/20 text-ink-soft hover:border-navy-950/50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-              {pendiente ? <Loader2 size={20} className="animate-spin" aria-hidden /> : <ImagePlus size={20} aria-hidden />}
-              <span className="text-xs">{pendiente ? 'Subiendo…' : 'Agregar fotos'}</span>
-              <input ref={entrada} type="file" multiple accept="image/*,.heic,.heif" disabled={!puedeSubir || pendiente}
-                className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" aria-label="Elegir fotos de la galería"
-                onChange={e => subir(e.target.files)} />
-            </label>
-          ) : (
-            <div key={`vacio-${k}`} aria-hidden
-              className="flex h-[132px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/10 text-ink-soft/60">
-              <ImagePlus size={20} aria-hidden />
-              <span className="text-xs">Espacio {fotos.length + k + 1}</span>
-            </div>
-          )
+          <div key={`vacio-${k}`} aria-hidden
+            className="flex h-[132px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-navy-950/10 text-ink-soft/60">
+            <ImagePlus size={20} aria-hidden />
+            <span className="text-xs">Espacio {fotos.length + k + 1}</span>
+          </div>
         ))}
+      </div>
+      <div className={`rounded-xl border border-line-dark bg-sky-soft p-3 ${!puedeSubir || pendiente ? 'opacity-60' : ''}`}>
+        <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-navy-950">
+          {pendiente ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <ImagePlus size={16} aria-hidden />}
+          {pendiente ? 'Subiendo fotos…' : 'Seleccionar fotos del celular'}
+        </p>
+        {/* Visible a propósito: el control nativo es el más fiable en Safari, Chrome y navegadores internos. */}
+        <input ref={entrada} type="file" multiple accept="image/*,.heic,.heif" disabled={!puedeSubir || pendiente}
+          className="block w-full cursor-pointer rounded-lg border border-navy-950/15 bg-white text-sm text-ink-soft file:mr-3 file:cursor-pointer file:border-0 file:bg-navy-950 file:px-3 file:py-2.5 file:font-semibold file:text-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:file:cursor-not-allowed"
+          aria-label="Seleccionar fotos del celular" onChange={e => subir(e.target.files)} />
       </div>
       {mensaje?.error && <p role="alert" className="text-xs text-red-700">{mensaje.error}</p>}
       {mensaje?.ok && <p className="text-xs text-green-700">{mensaje.ok}</p>}
