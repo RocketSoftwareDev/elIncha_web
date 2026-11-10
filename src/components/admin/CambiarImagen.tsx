@@ -65,11 +65,14 @@ export function CambiarImagen({ destino, id, actual, habilitada }: Props) {
           : <Shield size={24} className="text-navy-800" aria-hidden />}
       </span>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={!habilitada || pendiente} onClick={() => entrada.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-navy-950/15 bg-white px-3 py-2 text-sm font-semibold text-navy-950 hover:bg-admin-bg disabled:opacity-50">
+        <label aria-disabled={!habilitada || pendiente}
+          className="relative inline-flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border border-navy-950/15 bg-white px-3 py-2 text-sm font-semibold text-navy-950 hover:bg-admin-bg has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
           {pendiente ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <ImagePlus size={14} aria-hidden />}
           {pendiente ? 'Subiendo…' : destino === 'short' ? (actual ? 'Cambiar foto' : 'Subir foto') : esLiga ? 'Cambiar imagen' : actual ? 'Cambiar escudo' : 'Subir escudo'}
-        </button>
+          <input ref={entrada} type="file" accept="image/*,.heic,.heif" disabled={!habilitada || pendiente}
+            className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" aria-label="Elegir imagen de la galería"
+            onChange={e => subir(e.target.files)} />
+        </label>
         {destino === 'equipo' && actual && habilitada && (
           <button type="button" onClick={quitar} disabled={pendiente} aria-label="Quitar escudo"
             className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-ink-soft hover:text-red-700 disabled:opacity-50">
@@ -77,7 +80,6 @@ export function CambiarImagen({ destino, id, actual, habilitada }: Props) {
           </button>
         )}
       </div>
-      <input ref={entrada} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e => subir(e.target.files)} />
       <p className="basis-full text-xs text-ink-soft">
         {!habilitada
           ? 'En modo de prueba no se suben imágenes: se habilita al configurar Supabase.'
